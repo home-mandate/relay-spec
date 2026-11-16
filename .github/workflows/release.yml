@@ -1,0 +1,172 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Release
+
+# A tag vX.Y.Z, vX.Y.Z-alpha.N or vX.Y.Z-rc.N publishes a GitHub release of the Relay
+# Specification with the conformance report of that commit (conformance-report.yml). The release is created as a draft, the report
+# is attached to the draft, and only a draft with the attested report is published. A published
+# release is immutable (repository setting), so nothing can be added or replaced afterwards; a
+# failed run leaves a draft and needs a new version.
+#
+# Guards: only admins may create tags and tags are immutable (repository rulesets). The tag
+# must point to a commit on main, for a patch on release/X.Y (.github/scripts/release-base.sh),
+# that came from a pull request into that branch whose checks all passed, a version without a
+# suffix must have its entry in the changelog of RELAY-v0.md, go.mod must require a published
+# release of home-mandate/spec without a replace directive (users of the module get exactly
+# that version), and the release must not exist.
+# The Go module proxy serves a tag on its own: these guards keep a wrong tag from becoming a
+# release, not from existing, which is why they come with the tag ruleset.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Check the tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read # the pull request the commit came from
+      checks: read # its checks
+    outputs:
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the branches' history, to check where the tag points
+          persist-credentials: false
+
+      - name: Tag, branch and version
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          base=$(bash .github/scripts/release-base.sh "$TAG" "$GITHUB_SHA")
+          prerelease=false
+          if [[ "$TAG" == *-* ]]; then
+            prerelease=true
+          elif ! grep -qE "^### ${TAG//./\\.}( |$)" RELAY-v0.md; then
+            echo "::error::RELAY-v0.md has no changelog entry for $TAG"; exit 1
+          fi
+          { echo "base=$base"; echo "prerelease=$prerelease"; } >> "$GITHUB_OUTPUT"
+
+      # The branches take squash-merged pull requests; their checks ran on the pull request's
+      # head.
+      - name: The pull request's checks passed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ steps.version.outputs.base }}
+        run: |
+          set -euo pipefail
+          heads=$(gh pr list --repo "$GITHUB_REPOSITORY" --base "$BASE" --state merged --limit 200 \
+            --json headRefOid,mergeCommit \
+            --jq "[.[] | select(.mergeCommit.oid == \"$GITHUB_SHA\") | .headRefOid] | unique | .[]")
+          if [ "$(printf '%s\n' "$heads" | grep -c .)" != 1 ]; then
+            echo "::error::$GITHUB_SHA did not come from exactly one merged pull request into $BASE"; exit 1
+          fi
+          runs=$(gh api "repos/$GITHUB_REPOSITORY/commits/$heads/check-runs?per_page=100" \
+            --jq '.check_runs[] | "\(.status)|\(.conclusion)|\(.name)"')
+          printf '%s\n' "$runs"
+          for required in "Go (" "Lint (" "Fuzz ("; do
+            grep -qF "|$required" <<< "$runs" || { echo "::error::check '$required' did not run"; exit 1; }
+          done
+          if grep -vE '^completed\|(success|skipped|neutral)\|' <<< "$runs"; then
+            echo "::error::not every check of the pull request passed"; exit 1
+          fi
+
+      # Users of the module ignore replace directives and get the version go.mod requires; a
+      # pseudo-version or an unpublished tag would give them a state nobody released.
+      - name: The required core specification is a published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if grep -qE '^[[:space:]]*replace([[:space:](]|$)' go.mod; then
+            echo "::error::go.mod has a replace directive"; exit 1
+          fi
+          core=$(awk '$1 == "github.com/home-mandate/spec" { print $2 } $1 == "require" && $2 == "github.com/home-mandate/spec" { print $3 }' go.mod)
+          if ! [[ "$core" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-(alpha|rc)\.[0-9]+)?$ ]]; then
+            echo "::error::go.mod requires github.com/home-mandate/spec $core, which is not a release tag"; exit 1
+          fi
+          draft=$(gh release view "$core" --repo home-mandate/spec --json isDraft -q .isDraft) ||
+            { echo "::error::home-mandate/spec has no release $core"; exit 1; }
+          [ "$draft" = false ] || { echo "::error::the release $core of home-mandate/spec is a draft"; exit 1; }
+          echo "requires home-mandate/spec $core"
+
+      - name: Not released yet
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "::error::release $TAG exists already"; exit 1
+          fi
+
+  release:
+    name: Create the draft
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write # the release
+    steps:
+      # A re-run of failed jobs finds the draft of the first attempt and keeps it.
+      - name: Create the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          if draft=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft -q .isDraft 2> /dev/null); then
+            [ "$draft" = true ] || { echo "::error::release $TAG is published already"; exit 1; }
+            echo "The draft of $TAG exists from an earlier attempt"; exit 0
+          fi
+          flags=()
+          if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "Home-Mandate Relay Specification $TAG" --generate-notes "${flags[@]}"
+
+  conformance-report:
+    name: Conformance report
+    needs: release
+    permissions:
+      contents: write # the release asset
+      id-token: write # the attestation's signing certificate
+      attestations: write
+    uses: ./.github/workflows/conformance-report.yml
+    with:
+      tag: ${{ github.ref_name }}
+
+  # The gate: the draft becomes the release only with the attested report attached.
+  publish:
+    name: Publish the release
+    needs: conformance-report
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # the release
+      attestations: read # the report's provenance
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: The report is attached and attested
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/assets"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir "$dir" --pattern 'conformance-report*.json'
+          for file in conformance-report.json; do
+            [ -f "$dir/$file" ] || { echo "::error::$file is not attached to the draft of $TAG"; exit 1; }
+            gh attestation verify "$dir/$file" --repo "$GITHUB_REPOSITORY"
+          done
+
+      - name: Publish the draft
+        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false

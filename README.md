@@ -42,6 +42,7 @@ Home-Mandate for Home Assistant the first gateway.
 | `conformance/schema/` | JSON Schemas of the relay conformance files | Apache 2.0 |
 | `conformance/manifest.json` | All machine-readable files of the Relay Specification with SHA-256 and number of cases; `make manifest` rewrites it | Apache 2.0 |
 | `cmd/relay-conformance` | Live test of an operator against the conformance classes (RELAY-v0 Section 8) | Apache 2.0 |
+| `cmd/relay-reference` | Runs that live test against the reference on the loopback; its report is attached to every release | Apache 2.0 |
 | `internal/` | Reference code: operator, relay, DNS and gateway decisions that the tests run the cases and the live test against | Apache 2.0 |
 | `tools/vectors` | Generates the conformance files that need keys and writes the manifest | Apache 2.0 |
 | `*.go` (root) | Go package `relay`: the schemas, examples and cases embedded as `relay.FS()`, without the test keys | Apache 2.0 |
@@ -62,4 +63,4 @@ make manifest   # after changing a schema, an example or a conformance file
 
 - [home-mandate/spec](https://github.com/home-mandate/spec): the core specification, which this
   one builds on.
-- [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md).
+- [RELEASING.md](RELEASING.md), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md).
