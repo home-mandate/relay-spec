@@ -2,11 +2,14 @@
 
 # Home-Mandate Relay Specification v0 (Draft)
 
-Status: **Working draft. Not part of `v0.1.0` of the Home-Mandate
-Specification**; the freeze of Section 14 of SPEC-v0 does not cover this document, its schemas,
-its examples or its conformance cases.
-License of this document: CC BY 4.0 (`LICENSE-docs`). Schema and examples: Apache 2.0
-(`LICENSE`).
+Status: **Working draft of the first version.** This document, its schemas, its examples, its
+conformance cases and its reference code are versioned by the tags `vX.Y.Z` of the repository
+[home-mandate/relay-spec](https://github.com/home-mandate/relay-spec), independently of the
+Home-Mandate Specification ([home-mandate/spec](https://github.com/home-mandate/spec), called
+SPEC-v0 here). Each version names the version of SPEC-v0 it requires; this one requires SPEC-v0
+`v0.2.0` or later, for Section 11.7 "Remote access", and nothing in it is frozen yet (Section 11).
+License of this document: CC BY 4.0 (`LICENSE-docs`). Schemas, examples, conformance cases and
+code: Apache 2.0 (`LICENSE`).
 
 The key words "MUST", "MUST NOT", "SHOULD", "SHOULD NOT" and "MAY" in this document are to be
 interpreted as described in BCP 14 (RFC 2119, RFC 8174) when, and only when, they appear in
@@ -127,8 +130,8 @@ An operator publishes its parameters as a JSON document at
 https://<operator-domain>/.well-known/home-mandate-relay
 ```
 
-The document MUST validate against `relay/schema/metadata-v0.schema.json`; an example is
-`relay/examples/metadata.json`. A gateway MUST fetch it over HTTPS with TLS 1.3 (RFC 8446) or later and a certificate that is
+The document MUST validate against `schema/metadata-v0.schema.json`; an example is
+`examples/metadata.json`. A gateway MUST fetch it over HTTPS with TLS 1.3 (RFC 8446) or later and a certificate that is
 valid for the operator domain under the gateway's ordinary trust store, MUST NOT follow
 redirects, and MUST reject a document larger than 16 KiB or that is not I-JSON (RFC 7493). The document is closed: a member that
 the schema does not list makes it invalid. New members come with a new `type`; until this
@@ -532,7 +535,7 @@ that connecting often from elsewhere cannot lock the gateway out. A peer above a
 
 The gateway talks to the operator's **enrollment endpoint** over HTTPS (TLS 1.3 (RFC 8446) or later with a
 certificate valid for its host under the gateway's ordinary trust store). All messages are
-described by `relay/schema/enrollment-v0.schema.json`; examples are in `relay/examples/`.
+described by `schema/enrollment-v0.schema.json`; examples are in `examples/`.
 Section 1.2 shows the flow.
 
 ### 5.1 Directory, nonces and requests
@@ -1153,7 +1156,7 @@ that list; if it supports none of them, it does not pair. When an operator remov
 administrator that its CA is no longer allowed and SHOULD move to a listed CA, reporting the new
 account as Section 5.6 describes; if it supports no listed CA, it keeps its account, if it has one, and says so. A gateway that knows
 that its CA no longer meets the conditions stops obtaining certificates from it and tells its
-administrator. `relay/cas.md` lists, informatively,
+administrator. `cas.md` lists, informatively,
 CAs that meet both conditions according to public sources.
 
 ### 6.7 Certificate Transparency monitoring
@@ -1427,7 +1430,7 @@ this version defines the classes of operators and, in Section 8.5, lists cases f
 
 An operator **conforms** to this version if it passes all four classes. A claim of conformance
 names the version (the tag of the repository of this specification), the operator domain, the
-classes, the manifest of the cases (`relay/conformance/manifest.json`, by its SHA-256) and the date
+classes, the manifest of the cases (`conformance/manifest.json`, by its SHA-256) and the date
 of the test. The report of the test tool contains all of these and can be published. A test shows
 the state of the operator at that date; Section 8.4 lets it be repeated at any time.
 
@@ -1436,9 +1439,9 @@ notifications, is not part of a class (Section 7.10).
 
 ### 8.2 Cases
 
-The cases are in `relay/conformance/`, each file with a JSON Schema in `relay/conformance/schema/`,
-and `relay/conformance/manifest.json` lists every file with its SHA-256 and number of cases. Test
-keys are in `relay/conformance/keys/`; their private parts are public, and they serve only to check
+The cases are in `conformance/`, each file with a JSON Schema in `conformance/schema/`,
+and `conformance/manifest.json` lists every file with its SHA-256 and number of cases. Test
+keys are in `conformance/keys/`; their private parts are public, and they serve only to check
 the cases offline: they MUST NOT be used with a live operator.
 
 | File | Cases |
@@ -1463,7 +1466,7 @@ first added as a case.
 
 ### 8.3 Live test
 
-The test tool `relay-conformance` (in `relay/cmd/`) plays a gateway and an agent against a live operator.
+The test tool `relay-conformance` (in `cmd/`) plays a gateway and an agent against a live operator.
 With up to two pairing codes of the test account (Section 8.4) it pairs a test installation with
 keys it generates for this run, sends the requests of the cases with their deliberate defects and
 compares the errors, also requests of one installation at the URLs of another, checks the tunnel
@@ -1473,7 +1476,7 @@ defects and presents tokens that the relay must refuse, connects as an agent to 
 and to the own-domain name, and finally unpairs and checks that the installation, its certificates
 and its records are gone. It reports an ACME account URI at a CA of `acme_cas` that belongs to no
 account, so the CAA record of the test permits nobody and the test obtains no server certificate;
-the URI has the form of an account URI of that CA (the prefix in `relay/cas.md`) followed by a number
+the URI has the form of an account URI of that CA (the prefix in `cas.md`) followed by a number
 far above every number the CA has assigned, and the operator need not check at the CA whether the
 account exists. It
 honours `Retry-After` and spaces its attempts, so that the limits of an operator do not fail it. A
@@ -1483,7 +1486,7 @@ check fails.
 An operator is **conformant** in the report only if the tool ran all four classes with two pairing
 codes and an own domain; a run with fewer codes, without an own domain, with fewer classes, or in
 which the operator could not be reached or limited the rate is incomplete and says so, never
-conformant. The same holds when `acme_cas` lists no CA of `relay/cas.md`, because the tool then
+conformant. The same holds when `acme_cas` lists no CA of `cas.md`, because the tool then
 cannot form an account URI and leaves out the checks of ACME accounts and challenges, and whenever
 a check is skipped without an earlier failure. The cases `blocked` and `offline-too-long` and a pairing code for an existing installation (a replacement code) are checked
 offline only, because a live test cannot make an operator block its test account or wait for days. DNSSEC
@@ -1594,9 +1597,29 @@ Others learn something too:
 
 A household that wants less of this runs its gateway without a relay.
 
+## 11. Versions and stability
+
+- **Versions.** Releases of this specification are the tags `vX.Y.Z` of its repository, with the
+  rules of the organization for versions, pre-releases and patches. A claim of conformance names
+  the tag (Section 8).
+- **Dependency.** Each version requires a version of SPEC-v0 and states the lowest one at the top
+  of this document. A gateway that implements this specification also implements that version of
+  SPEC-v0; the rules of SPEC-v0 Section 11.7 apply to it whichever way it is reached.
+- **Until frozen.** Before the freeze, a new minor version may change any message, schema, case or
+  rule of this document; the Changelog says what changed and what an implementation has to do.
+- **Freeze.** This specification is frozen from the first release after a relay and a gateway,
+  implemented independently from this text, have worked together and passed the conformance tests
+  of Section 8. From then on the rules of SPEC-v0 Section 14 apply to its formats in the same way:
+  an incompatible change needs a new major version.
+
 ## Changelog
 
 ### Unreleased
+
+- This specification moved from home-mandate/spec to its own repository,
+  home-mandate/relay-spec, with its own versions (Section 11). Paths lose the prefix `relay/`;
+  the Go module is `github.com/home-mandate/relay-spec`. The cases of Certificate Transparency
+  monitoring stay in SPEC-v0 (`conformance/ct-v0.json`). New Section 11.
 
 - Sections 1.1, 6, 6.1, 6.7, 7.1 and 8.5: the rules that hold for every gateway reached from
   outside, whichever way, are now in SPEC-v0 Section 11.7: the public origin as OAuth issuer,
@@ -1606,7 +1629,7 @@ A household that wants less of this runs its gateway without a relay.
   Section 6 points to the gateway rules of Sections 7.1 and 7.8.
 - Normative change, Sections 3 and 5: the gateway fetches the metadata and talks to the enrollment
   endpoint with TLS 1.3 or later; TLS 1.2 is no longer enough.
-- Section 8.3: a run in which `acme_cas` lists no CA of `relay/cas.md`, or in which a check is
+- Section 8.3: a run in which `acme_cas` lists no CA of `cas.md`, or in which a check is
   skipped without an earlier failure, is incomplete, not conformant.
 - Section 8.5 and the files `pairing-v0.json`, `pins-v0.json`, `proxy-v0.json`, `destination-v0.json`,
   `caa-v0.json`, `protection-level-v0.json` and `ct-v0.json`: cases for the decisions of a gateway, without
@@ -1636,7 +1659,7 @@ A household that wants less of this runs its gateway without a relay.
   is discarded and a later registration, also of the same name, gets a new one, and an operator
   MUST NOT use a token again.
 - Section 8.1, 8.3 and Section 3: `metadata` also covers Sections 7.1 and 7.3, and `relay` Section
-  6.8; the test tool is in `relay/cmd/`, it is conformant only with two pairing codes, an own domain
+  6.8; the test tool is in `cmd/`, it is conformant only with two pairing codes, an own domain
   and all four classes, `blocked`, `offline-too-long` and replacement codes are checked offline
   only, DNSSEC and IPv6 are hints; `relay_addresses` MUST be globally reachable unicast addresses.
 - Section 6.4: registering a name that is registered already makes the operator look up the TXT
@@ -1652,7 +1675,7 @@ A household that wants less of this runs its gateway without a relay.
   `X25519MLKEM768` also when a ClientHello lists other groups. Section 4.4: a `stream-open` that
   arrives after the gateway's `drain` is refused with `stream-close`, not treated as an error.
 - Section 8 specified: conformance classes of operators (`metadata`, `enrollment`, `dns`, `relay`),
-  machine-readable cases in `relay/conformance/` with their own manifest, a live test of an operator
+  machine-readable cases in `conformance/` with their own manifest, a live test of an operator
   with `relay-conformance`, and a test account that an operator claiming conformance gives for
   repeated tests.
 - Section 4 specified: the tunnel protocol, with the parameters of the operator from the
@@ -1675,13 +1698,13 @@ A household that wants less of this runs its gateway without a relay.
 - Section 6 specified: standard and own-domain names, protection levels, CAA at the apex and at
   each name, registration and verification of own-domain names, determining the protection level
   in the gateway, CAs that log every certificate and enforce RFC 8657 (informative list
-  `relay/cas.md`), Certificate Transparency and CAA monitoring, active and backup pins; relay
+  `cas.md`), Certificate Transparency and CAA monitoring, active and backup pins; relay
   addresses in the metadata; error `name-unavailable`.
 - Section 5 specified: directory, nonces and signed requests, errors, pairing (including a
   pairing code for an existing installation), installation, tunnel certificate, renewal and
   re-issuance within `max_offline_days`, key change, ACME support with a CAA binding to the
   gateway's ACME account, unpairing and blocking;
-  schema `relay/schema/enrollment-v0.schema.json` with examples. Security considerations for
+  schema `schema/enrollment-v0.schema.json` with examples. Security considerations for
   Section 5.
 - Follow-ups for Sections 5 and 6 (#44): spelling-rule violations are `malformed`, response
   timeout and fixed enrollment host, stray installations after a lost pairing response, failed

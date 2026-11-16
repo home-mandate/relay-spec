@@ -1,35 +1,48 @@
-# Tool versions are pinned; `go run` fetches them on first use.
+# SPDX-License-Identifier: Apache-2.0
+
+# A go.work in a parent directory must not affect this module.
+export GOWORK := off
+
 STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.8.1
 GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.8.0
 ACTIONLINT  := github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 GITLEAKS    := github.com/zricethezav/gitleaks/v8@v8.28.0
 
-COVER_MIN := 80
-FUZZTIME  ?= 15s
-FUZZ_TARGETS := FuzzDecodeFrame FuzzReadFrame FuzzDecodeControl FuzzDecodeDataBind FuzzParseProxyV2 FuzzParseGatewaySPIFFEID FuzzHomeIDFromServerName
-export GOWORK := off
+COVER_MIN      := 95
+FUZZTIME       ?= 10m
+# package:target; the long fuzzing of scheduled.yml builds its matrix from this list (make fuzz-targets)
+FUZZ_TARGETS   := internal/dnsq:FuzzCAA internal/tunnelclient:FuzzPROXY internal/frames:FuzzReadFrame \
+	internal/frames:FuzzBind internal/tunnelcert:FuzzHomeIDOf internal/tunnelcert:FuzzCheckCSR
 
-.PHONY: check test cover vet staticcheck vulncheck actionlint secrets modverify hooks fuzz fuzz-targets
+.PHONY: check lint test cover vet modverify staticcheck vulncheck actionlint secrets hooks fuzz fuzz-one fuzz-targets manifest
 
-check: modverify vet staticcheck cover vulncheck actionlint secrets
+## check: everything that must be green before a commit, except lint
+check: modverify vet staticcheck cover vulncheck
+
+## lint: the workflows (actionlint) and the whole history for secrets (gitleaks)
+lint: actionlint secrets
 
 test:
-	go test -race -shuffle=on -count=1 ./...
+	go test -race ./...
 
 cover:
-	go test -race -shuffle=on -count=1 -coverprofile=cover.out ./...
-	@total=$$(go tool cover -func=cover.out | awk '/^total:/ {sub("%","",$$3); print $$3}'); \
-	echo "coverage $$total% (minimum $(COVER_MIN)%)"; \
-	awk -v t="$$total" -v m="$(COVER_MIN)" 'BEGIN { exit (t+0 < m+0) }' || { echo "coverage below $(COVER_MIN)%"; exit 1; }
+	go test -race -coverprofile=cover.out ./...
+	@go tool cover -func=cover.out | awk -v min=$(COVER_MIN) '/^total:/ { sub("%", "", $$3); \
+		if ($$3 + 0 < min) { print "Coverage " $$3 "% < " min "%"; exit 1 } else print "Coverage " $$3 "%" }'
 
 vet:
 	@test -z "$$(gofmt -l .)" || { gofmt -l .; echo "gofmt needed"; exit 1; }
 	go vet ./...
 
-# staticcheck v0.8.1 cannot read Go 1.27 export data (dominikh/go-tools#1832); same workaround
-# as home-mandate-cloud: a run whose only output is that error counts as a warning, anything else
-# fails. REMOVAL CONDITION: delete this workaround as soon as STATICCHECK is pinned to a release
-# that reads Go 1.27 export data (go-tools#1832 fixed); then a staticcheck error must fail again.
+## modverify: the module cache matches go.sum, and go mod tidy would change nothing
+modverify:
+	go mod verify
+	go mod tidy -diff
+
+# Temporary (2026-10-09): staticcheck v0.8.1 cannot read Go 1.27's export data
+# (dominikh/go-tools#1832). A run whose only output is that error (and module downloads)
+# counts as a warning; any other output still fails. Remove once a compatible staticcheck
+# release is pinned.
 STATICCHECK_EXPORT_DATA := export data version 5 is greater than maximum supported version 4
 staticcheck:
 	@out=$$(go run $(STATICCHECK) ./... 2>&1); status=$$?; \
@@ -47,24 +60,30 @@ vulncheck:
 actionlint:
 	go run $(ACTIONLINT)
 
-modverify:
-	go mod verify
-	go mod tidy -diff
+secrets:
+	go run $(GITLEAKS) git --redact --no-banner .
 
-# Runs every fuzz target for FUZZTIME (default 15s). Corpus seeds live in the tests.
-fuzz:
-	@for t in $(FUZZ_TARGETS); do \
-		echo "fuzz $$t"; \
-		go test ./tunnel -run '^$$' -fuzz "^$$t$$" -fuzztime $(FUZZTIME) || exit 1; \
-	done
-
-# Prints FUZZ_TARGETS as a JSON array; the scheduled workflow runs one job per target.
-fuzz-targets:
-	@printf '%s\n' $(FUZZ_TARGETS) | jq -R . | jq -sc .
-
-# Installs the repository's git hooks (gitleaks on staged changes before every commit).
+## hooks: once per clone, gitleaks on the staged changes before every commit
 hooks:
 	git config core.hooksPath .githooks
 
-secrets:
-	go run $(GITLEAKS) git --redact --no-banner .
+## manifest: rewrite conformance/manifest.json after changing schemas, examples or cases;
+## the tests (make cover) check it
+manifest:
+	go run ./tools/vectors manifest
+
+## fuzz: each target for FUZZTIME, e.g. make fuzz FUZZTIME=30s
+fuzz:
+	@for spec in $(FUZZ_TARGETS); do \
+		$(MAKE) --no-print-directory fuzz-one FUZZ=$$spec || exit 1; \
+	done
+
+## fuzz-one: one target for FUZZTIME, e.g. make fuzz-one FUZZ=internal/frames:FuzzBind FUZZTIME=30s
+fuzz-one:
+	@spec='$(FUZZ)'; pkg=$${spec%%:*}; target=$${spec#*:}; \
+	if [ -z "$$spec" ] || [ "$$pkg" = "$$spec" ]; then echo "FUZZ=package:target is needed"; exit 2; fi; \
+	go test ./$$pkg/ -run '^$$' -fuzz "^$$target\$$" -fuzztime $(FUZZTIME)
+
+## fuzz-targets: the targets, one package:target per line; the matrix of the long fuzzing is built from it
+fuzz-targets:
+	@printf '%s\n' $(FUZZ_TARGETS)

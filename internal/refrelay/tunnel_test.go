@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/frames"
-	"github.com/home-mandate/spec/relay/internal/refrelay"
-	"github.com/home-mandate/spec/relay/internal/tunnelclient"
+	"github.com/home-mandate/relay-spec/internal/frames"
+	"github.com/home-mandate/relay-spec/internal/refrelay"
+	"github.com/home-mandate/relay-spec/internal/tunnelclient"
 )
 
 // probe opens a control connection with the parameters and reports what the relay does: accepted

@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/tunnelclient"
+	"github.com/home-mandate/relay-spec/internal/tunnelclient"
 )
 
 var signature = []byte{0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A}

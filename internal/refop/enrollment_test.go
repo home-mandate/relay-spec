@@ -14,11 +14,11 @@ import (
 
 	"golang.org/x/net/dns/dnsmessage"
 
-	"github.com/home-mandate/spec/relay"
-	"github.com/home-mandate/spec/relay/internal/enroll"
-	"github.com/home-mandate/spec/relay/internal/enrollcases"
-	"github.com/home-mandate/spec/relay/internal/refdns"
-	"github.com/home-mandate/spec/relay/internal/refop"
+	"github.com/home-mandate/relay-spec"
+	"github.com/home-mandate/relay-spec/internal/enroll"
+	"github.com/home-mandate/relay-spec/internal/enrollcases"
+	"github.com/home-mandate/relay-spec/internal/refdns"
+	"github.com/home-mandate/relay-spec/internal/refop"
 )
 
 const (

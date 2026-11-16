@@ -1,16 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
 name: CI
 
-# Every push to a branch other than main: tests with coverage gate, static checks, vulnerability
-# and secret scan, and a short fuzz run of every decoder (a failing input is kept as an artifact).
-# Changes reach main only through a pull request, so the commit was already checked: there is no
-# second run for the pull request and none after the merge.
-# make modverify also fails on a go.mod that `go mod tidy` would change. Staticcheck is skipped
-# with a warning while v0.8.1 cannot read Go 1.27 export data; the Makefile states when to remove
-# that. This module has no image and publishes nothing; the gateway and the relay import it as a
-# Go module.
+# When what runs: a push to a branch runs this unit stage: make check (module, format, vet,
+# staticcheck, race tests with coverage, govulncheck) and make lint (actionlint, gitleaks over
+# the whole history); a pull request against main additionally runs integration.yml (short
+# fuzzing). Everything is checked before the merge: main takes squash-merged pull requests
+# only, up to date with main and with every required check green, so nothing runs after the
+# merge. scheduled.yml scans for vulnerabilities every night and fuzzes twice a month.
 on:
   push:
-    branches-ignore: [main]
+    branches-ignore: [main, "release/[0-9]+.[0-9]+"]
   workflow_dispatch:
 
 permissions:
@@ -21,10 +20,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  go:
-    name: Go (vet, staticcheck, race tests, coverage, actionlint)
+  check:
+    name: Go (vet, staticcheck, race tests, coverage, govulncheck)
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -32,52 +31,18 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - run: make modverify vet staticcheck cover actionlint
+      - run: make check
 
-  fuzz:
-    name: Fuzz (short run of every decoder)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-      - run: make fuzz FUZZTIME=10s
-      - name: Keep the failing input
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: fuzz-failing-input
-          path: tunnel/testdata/fuzz
-          if-no-files-found: ignore
-          retention-days: 14
-
-  govulncheck:
-    name: Vulnerability scan (govulncheck)
+  lint:
+    name: Lint (actionlint, gitleaks)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0 # the whole history, for gitleaks
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - run: make vulncheck
-
-  secrets:
-    name: Secret scan (gitleaks)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0 # the whole history
-          persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-      - run: make secrets
+      - run: make lint

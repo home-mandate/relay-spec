@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/frames"
+	"github.com/home-mandate/relay-spec/internal/frames"
 )
 
 // token is an agent connection that waits for a data connection (section 4.5).

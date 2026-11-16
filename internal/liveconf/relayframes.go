@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/frames"
-	"github.com/home-mandate/spec/relay/internal/tunnelclient"
+	"github.com/home-mandate/relay-spec/internal/frames"
+	"github.com/home-mandate/relay-spec/internal/tunnelclient"
 )
 
 // framesCases plays the cases of frames-v0.json whose defect comes from the gateway and whose

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/home-mandate/relay-spec"
 	"github.com/home-mandate/spec/manifest"
-	"github.com/home-mandate/spec/relay"
 )
 
 func TestFSHoldsSchemasExamplesAndCases(t *testing.T) {
@@ -74,11 +74,7 @@ func TestFSHoldsEveryFileOfTheManifest(t *testing.T) {
 	}
 	read, keys := 0, 0
 	for _, file := range stored.Files {
-		name, ok := strings.CutPrefix(file.Path, "relay/")
-		if !ok {
-			t.Errorf("%s is outside relay/", file.Path)
-			continue
-		}
+		name := file.Path
 		if strings.HasPrefix(name, "conformance/keys/") {
 			keys++
 			continue

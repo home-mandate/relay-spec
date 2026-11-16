@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/enroll"
+	"github.com/home-mandate/relay-spec/internal/enroll"
 )
 
 var homeIDPattern = regexp.MustCompile(`^[a-z2-7]{26}$`)

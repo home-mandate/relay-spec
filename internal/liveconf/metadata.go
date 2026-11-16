@@ -17,9 +17,9 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
+	"github.com/home-mandate/relay-spec"
+	"github.com/home-mandate/relay-spec/internal/metadata"
 	"github.com/home-mandate/spec/ijson"
-	"github.com/home-mandate/spec/relay"
-	"github.com/home-mandate/spec/relay/internal/metadata"
 )
 
 const (

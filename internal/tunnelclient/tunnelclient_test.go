@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/frames"
-	"github.com/home-mandate/spec/relay/internal/refrelay"
-	"github.com/home-mandate/spec/relay/internal/tunnelclient"
+	"github.com/home-mandate/relay-spec/internal/frames"
+	"github.com/home-mandate/relay-spec/internal/refrelay"
+	"github.com/home-mandate/relay-spec/internal/tunnelclient"
 )
 
 func TestDialChecksThePinOfTheRelay(t *testing.T) {

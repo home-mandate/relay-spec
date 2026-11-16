@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/netguard"
-	"github.com/home-mandate/spec/relay/internal/refdns"
-	"github.com/home-mandate/spec/relay/internal/refop"
+	"github.com/home-mandate/relay-spec/internal/netguard"
+	"github.com/home-mandate/relay-spec/internal/refdns"
+	"github.com/home-mandate/relay-spec/internal/refop"
 )
 
 func runEnroll(t *testing.T, cfg refop.Config, edit func(*Settings, *Env)) Result {
@@ -72,7 +72,7 @@ func TestACMEChecksAreSkippedWithoutAKnownCA(t *testing.T) {
 	data, _ := json.Marshal(doc)
 	res := runEnroll(t, refop.Config{Document: data}, nil)
 	c := res.Report.Classes[ClassEnrollment]
-	if !slices.Contains(res.Report.Incomplete, "acme_cas lists no CA of relay/cas.md, so the ACME checks were not made") ||
+	if !slices.Contains(res.Report.Incomplete, "acme_cas lists no CA of cas.md, so the ACME checks were not made") ||
 		c.Conforms || c.Failed != 0 || c.Skipped == 0 || res.Exit != ExitIncomplete || res.Report.Conforms {
 		t.Errorf("incomplete %v, class %+v, exit %d", res.Report.Incomplete, c, res.Exit)
 	}

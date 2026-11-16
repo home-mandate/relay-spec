@@ -18,8 +18,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/enroll"
-	"github.com/home-mandate/spec/relay/internal/netguard"
+	"github.com/home-mandate/relay-spec/internal/enroll"
+	"github.com/home-mandate/relay-spec/internal/netguard"
 )
 
 const (

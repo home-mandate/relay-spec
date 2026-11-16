@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-const modulePath = "github.com/home-mandate/spec/"
+const modulePath = "github.com/home-mandate/relay-spec/"
 
 // referencePackages are the packages that hold test keys, reference operators and faults;
 // nothing the tool or the files of package relay (which are not tests) import may reach them
@@ -33,24 +33,26 @@ func importsOf(t *testing.T, dir string, seen map[string]bool) {
 			continue
 		}
 		seen[imp] = true
-		if sub, ok := strings.CutPrefix(imp, modulePath); ok {
-			importsOf(t, filepath.Join("..", "..", "..", filepath.FromSlash(sub)), seen)
+		if imp == strings.TrimSuffix(modulePath, "/") {
+			importsOf(t, filepath.Join("..", ".."), seen)
+		} else if sub, ok := strings.CutPrefix(imp, modulePath); ok {
+			importsOf(t, filepath.Join("..", "..", filepath.FromSlash(sub)), seen)
 		}
 	}
 }
 
 func TestToolAndEmbeddedFilesNeverReachTheReferenceOperator(t *testing.T) {
 	for name, dir := range map[string]string{
-		"relay-conformance":           ".",
-		"package relay":               filepath.Join("..", ".."),
-		"relay/internal/liveconf":     filepath.Join("..", "..", "internal", "liveconf"),
-		"relay/internal/netguard":     filepath.Join("..", "..", "internal", "netguard"),
-		"relay/internal/dnsq":         filepath.Join("..", "..", "internal", "dnsq"),
-		"relay/internal/enroll":       filepath.Join("..", "..", "internal", "enroll"),
-		"relay/internal/enrollcases":  filepath.Join("..", "..", "internal", "enrollcases"),
-		"relay/internal/tunnelclient": filepath.Join("..", "..", "internal", "tunnelclient"),
-		"relay/internal/frames":       filepath.Join("..", "..", "internal", "frames"),
-		"relay/internal/tunnelcert":   filepath.Join("..", "..", "internal", "tunnelcert"),
+		"relay-conformance":     ".",
+		"package relay":         filepath.Join("..", ".."),
+		"internal/liveconf":     filepath.Join("..", "..", "internal", "liveconf"),
+		"internal/netguard":     filepath.Join("..", "..", "internal", "netguard"),
+		"internal/dnsq":         filepath.Join("..", "..", "internal", "dnsq"),
+		"internal/enroll":       filepath.Join("..", "..", "internal", "enroll"),
+		"internal/enrollcases":  filepath.Join("..", "..", "internal", "enrollcases"),
+		"internal/tunnelclient": filepath.Join("..", "..", "internal", "tunnelclient"),
+		"internal/frames":       filepath.Join("..", "..", "internal", "frames"),
+		"internal/tunnelcert":   filepath.Join("..", "..", "internal", "tunnelcert"),
 	} {
 		seen := map[string]bool{}
 		importsOf(t, dir, seen)
@@ -78,7 +80,7 @@ func TestGuardSeesAnImportOfTheReference(t *testing.T) {
 	for _, imp := range pkg.TestImports {
 		seen[imp] = true
 	}
-	if !slices.Contains(mapKeys(seen), modulePath+"relay/internal/refop") {
+	if !slices.Contains(mapKeys(seen), modulePath+"internal/refop") {
 		t.Error("the tests of liveconf do not import refop: the guard cannot be shown to work")
 	}
 }

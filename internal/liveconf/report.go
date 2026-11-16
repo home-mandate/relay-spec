@@ -13,7 +13,7 @@ import (
 const SpecName = "relay-v0"
 
 // LiveFile is the file of a failure that a live check found; the cases of the files of
-// relay/conformance are played offline by the tests of the repository.
+// conformance are played offline by the tests of the repository.
 const LiveFile = "live"
 
 // Report is the machine-readable result of a run. The members spec, manifest, classes and
@@ -23,7 +23,7 @@ type Report struct {
 	Spec string `json:"spec"`
 	// Version is the version of the tool.
 	Version string `json:"version"`
-	// Manifest is the SHA-256 of relay/conformance/manifest.json: it identifies the cases.
+	// Manifest is the SHA-256 of conformance/manifest.json: it identifies the cases.
 	Manifest string `json:"manifest"`
 	Operator string `json:"operator"`
 	// Date is the day of the run, UTC (RELAY-v0 section 8.1).

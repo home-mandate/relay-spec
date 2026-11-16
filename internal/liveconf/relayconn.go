@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/netguard"
-	"github.com/home-mandate/spec/relay/internal/tunnelclient"
+	"github.com/home-mandate/relay-spec/internal/netguard"
+	"github.com/home-mandate/relay-spec/internal/tunnelclient"
 )
 
 // pollInterval is how often the tool looks at connections it waits for.

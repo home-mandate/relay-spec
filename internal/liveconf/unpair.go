@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"slices"
 
-	"github.com/home-mandate/spec/relay/internal/enroll"
+	"github.com/home-mandate/relay-spec/internal/enroll"
 )
 
 var errNoKey = errors.New("no key of the state file fits the installation")

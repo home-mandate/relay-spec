@@ -5,12 +5,15 @@ package refgateway_test
 import (
 	"encoding/hex"
 	"encoding/json"
+	"io/fs"
 	"os"
 	"reflect"
 	"slices"
 	"testing"
 
-	"github.com/home-mandate/spec/relay/internal/refgateway"
+	"github.com/home-mandate/spec"
+
+	"github.com/home-mandate/relay-spec/internal/refgateway"
 )
 
 // verdict is the outcome of one case against the reference with some faults: "" if the case
@@ -29,12 +32,15 @@ type caseFamily struct {
 
 func loadFile[T any](t *testing.T, name string) []T {
 	t.Helper()
-	dir := "../../conformance/"
+	var data []byte
+	var err error
 	if name == "ct" {
-		// The cases of Certificate Transparency monitoring belong to SPEC-v0 section 11.7.
-		dir = "../../../conformance/"
+		// The cases of Certificate Transparency monitoring belong to SPEC-v0 section 11.7 of
+		// the Home-Mandate Specification, which this module depends on.
+		data, err = fs.ReadFile(spec.FS(), spec.CTCasesPath)
+	} else {
+		data, err = os.ReadFile("../../conformance/" + name + "-v0.json")
 	}
-	data, err := os.ReadFile(dir + name + "-v0.json")
 	if err != nil {
 		t.Fatal(err)
 	}

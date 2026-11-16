@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/frames"
+	"github.com/home-mandate/relay-spec/internal/frames"
 )
 
 const (

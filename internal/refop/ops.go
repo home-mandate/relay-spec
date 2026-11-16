@@ -13,8 +13,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/home-mandate/relay-spec/internal/tunnelcert"
 	"github.com/home-mandate/spec/jws"
-	"github.com/home-mandate/spec/relay/internal/tunnelcert"
 )
 
 var (

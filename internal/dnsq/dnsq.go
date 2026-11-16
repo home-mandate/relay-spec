@@ -21,7 +21,7 @@ import (
 
 	"golang.org/x/net/dns/dnsmessage"
 
-	"github.com/home-mandate/spec/relay/internal/netguard"
+	"github.com/home-mandate/relay-spec/internal/netguard"
 )
 
 // Record types the tool asks for.

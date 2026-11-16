@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package enrollcases reads the cases of relay/conformance/enrollment-v0.json and plays them
+// Package enrollcases reads the cases of conformance/enrollment-v0.json and plays them
 // against an enrollment endpoint: the tests of the reference operator and the live test play
 // the same cases with the same code. A case is symbolic; Actors give it keys and URLs.
 package enrollcases
@@ -12,7 +12,7 @@ import (
 	"errors"
 	"io/fs"
 
-	"github.com/home-mandate/spec/relay/internal/enroll"
+	"github.com/home-mandate/relay-spec/internal/enroll"
 )
 
 // Path is the case file within the files of package relay.

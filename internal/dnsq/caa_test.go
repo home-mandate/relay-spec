@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/home-mandate/spec/relay/internal/dnsq"
+	"github.com/home-mandate/relay-spec/internal/dnsq"
 )
 
 func TestParseCAA(t *testing.T) {

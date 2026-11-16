@@ -5,7 +5,7 @@ package liveconf
 import "slices"
 
 // testKeyThumbprints are the JWK thumbprints (RFC 7638, SHA-256) of the Ed25519 and P-256 keys
-// of relay/conformance/keys/test-keys.json. The private parts of these keys are public: the
+// of conformance/keys/test-keys.json. The private parts of these keys are public: the
 // tool refuses to use any of them with a live operator (RELAY-v0 section 8.2). A test checks
 // the list against the file.
 var testKeyThumbprints = []string{

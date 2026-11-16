@@ -21,7 +21,7 @@ import (
 	"github.com/home-mandate/spec/jws"
 )
 
-// relayJWSDescription is the description of relay/conformance/jws-v0.json.
+// relayJWSDescription is the description of conformance/jws-v0.json.
 const relayJWSDescription = "Requests of the Relay Specification v0 (draft), RELAY-v0.md sections 5.1 and 5.5. " +
 	"Each case: a compact JWS, of kind request (the body of a POST to the enrollment endpoint) or key-change " +
 	"(the inner JWS of a key change); the public key that verifies it, or null when the header carries it as jwk; " +
@@ -30,7 +30,7 @@ const relayJWSDescription = "Requests of the Relay Specification v0 (draft), REL
 	"(section 5.1 steps 1 to 3 and the alg check of step 4, or for key changes the inner header and spelling of section 5.5); " +
 	"a bad-signature case has no other defect. The payloads are only checked for I-JSON and for being " +
 	"an object (or, for a request, empty), not against their schema. The keys are test keys; their private " +
-	"parts are in relay/conformance/keys/test-keys.private.json. Generated with go run ./tools/vectors relay-jws."
+	"parts are in conformance/keys/test-keys.private.json. Generated with go run ./tools/vectors relay-jws."
 
 const (
 	relayNonce    = "oFvnlFP1wIhRlYS2jTaXbA"
@@ -42,7 +42,7 @@ const (
 	relayCSRBody  = `{"csr":"MIIB"}`
 )
 
-// relayJWSCase is a case of relay/conformance/jws-v0.json.
+// relayJWSCase is a case of conformance/jws-v0.json.
 type relayJWSCase struct {
 	ID       string          `json:"id"`
 	Kind     string          `json:"kind"`

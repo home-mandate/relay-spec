@@ -1,8 +1,17 @@
-# Default gitleaks rules plus one exact allowlist entry: the name of the TLS key-exchange group
-# X25519MLKEM768 next to the words "key exchange" looks like a generic API key.
+# Default gitleaks rules with exact allowlist entries for test material, which is public by design:
+# - the name of the TLS key-exchange group X25519MLKEM768, which looks like a generic API key;
+# - the conformance cases and examples, which hold signed test requests (JWS), public test keys
+#   and example tokens (RELAY-v0 Section 8.2: their private parts are public);
+# - two test files with base64url values of test keys and the names of test keys.
 [extend]
 useDefault = true
 
 [allowlist]
-description = "TLS group name, not a secret"
+description = "Public test material, not secrets"
 regexes = ['''^X25519MLKEM768$''']
+paths = [
+  '''^conformance/[a-z0-9-]+\.json$''',
+  '''^examples/[a-z0-9-]+\.json$''',
+  '''^enrollment_test\.go$''',
+  '''^tools/vectors/tunnelcert\.go$''',
+]

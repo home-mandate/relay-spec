@@ -9,19 +9,16 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/home-mandate/spec/manifest"
-	"github.com/home-mandate/spec/relay"
 )
 
 // TestRelayJWSFileIsUpToDate: the stored cases are those the generator writes, byte for
 // byte: ES256 signatures are deterministic (RFC 6979).
 func TestRelayJWSFileIsUpToDate(t *testing.T) {
-	out, err := runTool(t, "../..", "", "relay-jws", "relay/conformance/keys/test-keys.private.json")
+	out, err := runTool(t, "../..", "", "relay-jws", "conformance/keys/test-keys.private.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stored, err := os.ReadFile("../../relay/conformance/jws-v0.json")
+	stored, err := os.ReadFile("../../conformance/jws-v0.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +33,7 @@ func TestRelayJWSFileIsUpToDate(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got.Description != want.Description || len(got.Cases) != len(want.Cases) {
-		t.Fatalf("description or number of cases differ; run: go run ./tools/vectors relay-jws relay/conformance/keys/test-keys.private.json > relay/conformance/jws-v0.json")
+		t.Fatalf("description or number of cases differ; run: go run ./tools/vectors relay-jws conformance/keys/test-keys.private.json > conformance/jws-v0.json")
 	}
 	for i, g := range got.Cases {
 		w := want.Cases[i]
@@ -45,12 +42,13 @@ func TestRelayJWSFileIsUpToDate(t *testing.T) {
 		}
 	}
 	if out != string(stored) {
-		t.Error("relay/conformance/jws-v0.json is not byte for byte what the generator writes")
+		t.Error("conformance/jws-v0.json is not byte for byte what the generator writes")
 	}
 }
 
 func TestRelayJWSRejectsBadArguments(t *testing.T) {
-	for _, args := range [][]string{{"relay-jws"}, {"relay-jws", "nope.json"}, {"relay-jws", "conformance/keys/test-keys.private.json"}} {
+	noKeys := keySetWithoutTheRelayKeys(t)
+	for _, args := range [][]string{{"relay-jws"}, {"relay-jws", "nope.json"}, {"relay-jws", noKeys}} {
 		if _, err := runTool(t, "../..", "", args...); err == nil {
 			t.Errorf("run(%v) succeeded", args)
 		}
@@ -63,57 +61,25 @@ func TestRelayJWSRejectsBadArguments(t *testing.T) {
 	}
 }
 
-func TestManifestWritesAndChecksTheRelayManifest(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, "relay", "conformance"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	cases := filepath.Join(dir, "relay", "conformance", "jws-v0.json")
-	if err := os.WriteFile(cases, []byte(`{"cases":[{}]}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := runTool(t, dir, "", "manifest"); err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(relay.ManifestLayout.Path)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if m, err := manifest.Decode(data); err != nil || m.Spec != "relay-v0" || len(m.Files) != 1 || m.Files[0].Cases != 1 {
-		t.Fatalf("manifest = %+v, %v", m, err)
-	}
-	if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(manifest.Path))); err == nil {
-		t.Error("a tree without conformance/ got its manifest")
-	}
-	if err := os.WriteFile(cases, []byte(`{"cases":[{},{}]}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := runTool(t, dir, "", "manifest", "-check"); err == nil {
-		t.Error("manifest -check passed although a relay file changed")
-	}
-}
-
-// TestRelayCertificateFilesAreUpToDate: the stored CSR and certificate cases are those the
-// generator writes, byte for byte.
 func TestRelayCertificateFilesAreUpToDate(t *testing.T) {
 	for command, file := range map[string]string{"relay-csr": "csr-v0.json", "relay-certificate": "certificate-v0.json"} {
-		out, err := runTool(t, "../..", "", command, "relay/conformance/keys/test-keys.private.json")
+		out, err := runTool(t, "../..", "", command, "conformance/keys/test-keys.private.json")
 		if err != nil {
 			t.Fatalf("%s: %v", command, err)
 		}
-		stored, err := os.ReadFile("../../relay/conformance/" + file)
+		stored, err := os.ReadFile("../../conformance/" + file)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if out != string(stored) {
-			t.Errorf("relay/conformance/%s is not what the generator writes; run: go run ./tools/vectors %s relay/conformance/keys/test-keys.private.json > relay/conformance/%s", file, command, file)
+			t.Errorf("conformance/%s is not what the generator writes; run: go run ./tools/vectors %s conformance/keys/test-keys.private.json > conformance/%s", file, command, file)
 		}
 	}
 }
 
 func TestRelayCertificateCommandsRejectBadArguments(t *testing.T) {
 	for _, command := range []string{"relay-csr", "relay-certificate"} {
-		for _, args := range [][]string{{command}, {command, "nope.json"}, {command, "conformance/keys/test-keys.private.json"}} {
+		for _, args := range [][]string{{command}, {command, "nope.json"}, {command, keySetWithoutTheRelayKeys(t)}} {
 			if _, err := runTool(t, "../..", "", args...); err == nil {
 				t.Errorf("run(%v) succeeded", args)
 			}
@@ -156,7 +122,7 @@ func TestPrivateKeyRefusesBrokenRSAKeys(t *testing.T) {
 }
 
 func TestCertificateGeneratorRefusesKeysOfTheWrongType(t *testing.T) {
-	signers, err := loadSigners("../..", "relay/conformance/keys/test-keys.private.json", relayCertKids)
+	signers, err := loadSigners("../..", "conformance/keys/test-keys.private.json", relayCertKids)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +130,7 @@ func TestCertificateGeneratorRefusesKeysOfTheWrongType(t *testing.T) {
 	if _, err := relayCertificateCases(signers); err == nil {
 		t.Error("a P-256 CA key was accepted")
 	}
-	signers, err = loadSigners("../..", "relay/conformance/keys/test-keys.private.json", relayCSRKids)
+	signers, err = loadSigners("../..", "conformance/keys/test-keys.private.json", relayCSRKids)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +147,7 @@ func TestCSRHelpersRefuseUnsupportedKeys(t *testing.T) {
 	if _, err := compressedCSR("not a key"); err == nil {
 		t.Error("compressedCSR accepted a key that is not P-256")
 	}
-	signers, err := loadSigners("../..", "relay/conformance/keys/test-keys.private.json", []string{"relay-tunnel"})
+	signers, err := loadSigners("../..", "conformance/keys/test-keys.private.json", []string{"relay-tunnel"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,12 +167,12 @@ func TestRelayProxyFileIsUpToDate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stored, err := os.ReadFile("../../relay/conformance/proxy-v0.json")
+	stored, err := os.ReadFile("../../conformance/proxy-v0.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if out != string(stored) {
-		t.Error("relay/conformance/proxy-v0.json is not what the generator writes; run: go run ./tools/vectors relay-proxy > relay/conformance/proxy-v0.json")
+		t.Error("conformance/proxy-v0.json is not what the generator writes; run: go run ./tools/vectors relay-proxy > conformance/proxy-v0.json")
 	}
 	if _, err := runTool(t, "../..", "", "relay-proxy", "extra"); err == nil {
 		t.Error("relay-proxy accepted an argument")
@@ -229,4 +195,14 @@ func TestRelayProxyCasesAreConsistent(t *testing.T) {
 	if !seen[proxyAccepted] || !seen[proxyRefused] || !seen[proxyEither] {
 		t.Errorf("results covered: %v", seen)
 	}
+}
+
+// keySetWithoutTheRelayKeys is a JWK Set that holds none of the keys the generators need.
+func keySetWithoutTheRelayKeys(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "keys.json")
+	if err := os.WriteFile(path, []byte(`{"keys":[]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }

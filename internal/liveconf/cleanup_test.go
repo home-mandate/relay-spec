@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/home-mandate/spec/relay/internal/refop"
+	"github.com/home-mandate/relay-spec/internal/refop"
 )
 
 const secretToken = "s3cret-token"

@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/frames"
-	"github.com/home-mandate/spec/relay/internal/refrelay"
-	"github.com/home-mandate/spec/relay/internal/tunnelclient"
+	"github.com/home-mandate/relay-spec/internal/frames"
+	"github.com/home-mandate/relay-spec/internal/refrelay"
+	"github.com/home-mandate/relay-spec/internal/tunnelclient"
 )
 
 // errorOf reads what the relay sends on a control connection that has not started its reader.

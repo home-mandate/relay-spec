@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/home-mandate/spec/relay/internal/refop"
-	"github.com/home-mandate/spec/relay/internal/refrelay"
+	"github.com/home-mandate/relay-spec/internal/refop"
+	"github.com/home-mandate/relay-spec/internal/refrelay"
 )
 
 // chainReplaced wraps the operator so that the chain of every pairing response is the given one.

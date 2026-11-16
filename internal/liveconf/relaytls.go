@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/tunnelcert"
-	"github.com/home-mandate/spec/relay/internal/tunnelclient"
+	"github.com/home-mandate/relay-spec/internal/tunnelcert"
+	"github.com/home-mandate/relay-spec/internal/tunnelclient"
 )
 
 var (

@@ -18,9 +18,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/home-mandate/spec/relay"
-	"github.com/home-mandate/spec/relay/internal/refdns"
-	"github.com/home-mandate/spec/relay/internal/refrelay"
+	"github.com/home-mandate/relay-spec"
+	"github.com/home-mandate/relay-spec/internal/refdns"
+	"github.com/home-mandate/relay-spec/internal/refrelay"
 )
 
 // DefaultCodes are the pairing codes of the test account of a reference operator.
@@ -160,7 +160,7 @@ func (o *Operator) serveMetadata(w http.ResponseWriter, r *http.Request) {
 }
 
 // Metadata returns the document an operator with this configuration publishes: the example
-// of relay/examples/metadata.json with the domains of the reference operator, and the
+// of examples/metadata.json with the domains of the reference operator, and the
 // defects of the configuration.
 func (o *Operator) Metadata() []byte {
 	if o.cfg.Document != nil {

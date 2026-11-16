@@ -2,7 +2,7 @@
 
 package refgateway_test
 
-import "github.com/home-mandate/spec/relay/internal/refgateway"
+import "github.com/home-mandate/relay-spec/internal/refgateway"
 
 // Generated from the constants of the package; the order is that of the source.
 
