@@ -21,15 +21,15 @@ import (
 	"time"
 )
 
-// relayCSRDescription is the description of relay/conformance/csr-v0.json.
+// relayCSRDescription is the description of conformance/csr-v0.json.
 const relayCSRDescription = "Certificate signing requests for tunnel certificates of the Relay Specification v0 (draft), RELAY-v0.md section 5.4. " +
 	"Each case: csr as in the payload of a certificate request (PKCS #10 in DER, base64url without padding), the installation key, " +
 	"the keys of the tunnel certificates the operator issued to the installation before, and whether the operator accepts the request " +
-	"or refuses it with bad-csr. Every csr is valid against $defs/der of relay/schema/enrollment-v0.schema.json; one that is not " +
+	"or refuses it with bad-csr. Every csr is valid against $defs/der of schema/enrollment-v0.schema.json; one that is not " +
 	"is malformed (section 5.1 step 6), not bad-csr. The keys are test keys; their private parts are in " +
-	"relay/conformance/keys/test-keys.private.json. Generated with go run ./tools/vectors relay-csr."
+	"conformance/keys/test-keys.private.json. Generated with go run ./tools/vectors relay-csr."
 
-// relayCertificateDescription is the description of relay/conformance/certificate-v0.json.
+// relayCertificateDescription is the description of conformance/certificate-v0.json.
 const relayCertificateDescription = "Tunnel certificates of the Relay Specification v0 (draft), RELAY-v0.md section 5.4, " +
 	"as the chain of a certificate response. Each case: chain (DER, base64url without padding, the issued certificate first), " +
 	"not_after of the response, the tunnel key of the request, trust_domain and home_id of the installation, requested_at " +
@@ -43,7 +43,7 @@ const relayCertificateDescription = "Tunnel certificates of the Relay Specificat
 	"a second certificate, it issued the first and carries a name constraint whose permitted URI subtree is trust_domain alone. " +
 	"Valid means that the certificate meets section 5.4 as the live test checks it; a gateway has to refuse only what fails the checks section 5.4 lists for it. " +
 	"Whether the serial number has 64 random bits cannot be seen in one certificate. The keys are test keys; their private parts are " +
-	"in relay/conformance/keys/test-keys.private.json. Generated with go run ./tools/vectors relay-certificate."
+	"in conformance/keys/test-keys.private.json. Generated with go run ./tools/vectors relay-certificate."
 
 // relayCSRKids and relayCertKids are the test keys of the cases.
 var (
@@ -72,7 +72,7 @@ var (
 	relayReceived = relayAt.Add(2 * time.Second)
 )
 
-// relayCSRCase is a case of relay/conformance/csr-v0.json.
+// relayCSRCase is a case of conformance/csr-v0.json.
 type relayCSRCase struct {
 	ID              string            `json:"id"`
 	CSR             string            `json:"csr"`
@@ -82,7 +82,7 @@ type relayCSRCase struct {
 	Why             string            `json:"why"`
 }
 
-// relayCertificateCase is a case of relay/conformance/certificate-v0.json.
+// relayCertificateCase is a case of conformance/certificate-v0.json.
 type relayCertificateCase struct {
 	ID               string          `json:"id"`
 	Chain            []string        `json:"chain"`

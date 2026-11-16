@@ -5,8 +5,8 @@ package refop_test
 import (
 	"testing"
 
-	"github.com/home-mandate/spec/relay/internal/enroll"
-	"github.com/home-mandate/spec/relay/internal/refop"
+	"github.com/home-mandate/relay-spec/internal/enroll"
+	"github.com/home-mandate/relay-spec/internal/refop"
 )
 
 // afterKeyConflict pairs A, tries the second code with A's key, and then with a new key.

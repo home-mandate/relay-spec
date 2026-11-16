@@ -12,7 +12,7 @@ import (
 
 	"golang.org/x/net/dns/dnsmessage"
 
-	"github.com/home-mandate/spec/relay/internal/refdns"
+	"github.com/home-mandate/relay-spec/internal/refdns"
 )
 
 func query(t *testing.T, name string, typ dnsmessage.Type) []byte {

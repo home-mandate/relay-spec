@@ -17,9 +17,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/home-mandate/spec/relay"
-	"github.com/home-mandate/spec/relay/internal/enroll"
-	"github.com/home-mandate/spec/relay/internal/netguard"
+	"github.com/home-mandate/relay-spec"
+	"github.com/home-mandate/relay-spec/internal/enroll"
+	"github.com/home-mandate/relay-spec/internal/netguard"
 )
 
 // Exit codes of relay-conformance (RELAY-v0 section 8.3). A failed clean-up (4) takes

@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/enroll"
-	"github.com/home-mandate/spec/relay/internal/refop"
+	"github.com/home-mandate/relay-spec/internal/enroll"
+	"github.com/home-mandate/relay-spec/internal/refop"
 )
 
 // scripted is a Transport that answers from a list and records the requests.

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/refop"
+	"github.com/home-mandate/relay-spec/internal/refop"
 )
 
 // isRelayDial reports whether a connection goes to the relay: its host for tunnel connections, or

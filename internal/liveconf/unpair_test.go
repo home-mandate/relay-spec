@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/enroll"
-	"github.com/home-mandate/spec/relay/internal/refdns"
-	"github.com/home-mandate/spec/relay/internal/refop"
+	"github.com/home-mandate/relay-spec/internal/enroll"
+	"github.com/home-mandate/relay-spec/internal/refdns"
+	"github.com/home-mandate/relay-spec/internal/refop"
 )
 
 const enrollURL = "https://" + refop.DefaultOperator + "/enroll/directory"

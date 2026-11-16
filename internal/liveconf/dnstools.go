@@ -10,8 +10,8 @@ import (
 
 	"golang.org/x/net/dns/dnsmessage"
 
-	"github.com/home-mandate/spec/relay/internal/dnsq"
-	"github.com/home-mandate/spec/relay/internal/netguard"
+	"github.com/home-mandate/relay-spec/internal/dnsq"
+	"github.com/home-mandate/relay-spec/internal/netguard"
 )
 
 var errNotVisible = errors.New("the record does not show on all name servers of its zone in time")

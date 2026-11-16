@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/home-mandate/spec/relay/internal/metadata"
+	"github.com/home-mandate/relay-spec/internal/metadata"
 )
 
 func TestCleanMetadataIsValid(t *testing.T) {

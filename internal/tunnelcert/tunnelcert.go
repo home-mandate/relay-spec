@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package tunnelcert checks certificate signing requests and issued tunnel certificates
-// (RELAY-v0 section 5.4). It is the reference for the cases in relay/conformance/csr-v0.json
-// and relay/conformance/certificate-v0.json, used only by tests.
+// (RELAY-v0 section 5.4). It is the reference for the cases in conformance/csr-v0.json
+// and conformance/certificate-v0.json, used only by tests.
 package tunnelcert
 
 import (

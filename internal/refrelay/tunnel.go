@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/frames"
-	"github.com/home-mandate/spec/relay/internal/tunnelcert"
+	"github.com/home-mandate/relay-spec/internal/frames"
+	"github.com/home-mandate/relay-spec/internal/tunnelcert"
 )
 
 // Frame types that tell the two kinds of tunnel connection apart (section 4.2).

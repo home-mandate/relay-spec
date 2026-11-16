@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/home-mandate/spec/relay/internal/refop"
+	"github.com/home-mandate/relay-spec/internal/refop"
 )
 
 var metadataOnly = Settings{Operator: refop.DefaultOperator, Classes: []string{ClassMetadata}}

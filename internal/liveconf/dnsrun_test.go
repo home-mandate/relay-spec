@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/dnsq"
-	"github.com/home-mandate/spec/relay/internal/refop"
+	"github.com/home-mandate/relay-spec/internal/dnsq"
+	"github.com/home-mandate/relay-spec/internal/refop"
 )
 
 func caaAnswer(values ...string) dnsq.Answer {
@@ -174,7 +174,7 @@ func TestAccountPrefixesAreTheOnesOfTheCAList(t *testing.T) {
 	}
 	for caa, prefix := range accountPrefixes {
 		if !strings.Contains(string(cas), "`"+caa+"`") || !strings.Contains(string(cas), "`"+prefix+"`") {
-			t.Errorf("relay/cas.md does not list %s with the prefix %s", caa, prefix)
+			t.Errorf("cas.md does not list %s with the prefix %s", caa, prefix)
 		}
 	}
 	account, caa, ok := accountURI([]string{"unknown.example", "letsencrypt.org"})

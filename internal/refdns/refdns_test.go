@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/home-mandate/spec/relay/internal/refdns"
+	"github.com/home-mandate/relay-spec/internal/refdns"
 )
 
 func TestZonesStoreAndRemoveRecords(t *testing.T) {

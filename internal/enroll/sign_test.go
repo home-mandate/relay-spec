@@ -14,8 +14,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/home-mandate/relay-spec/internal/enroll"
 	"github.com/home-mandate/spec/jws"
-	"github.com/home-mandate/spec/relay/internal/enroll"
 )
 
 const (

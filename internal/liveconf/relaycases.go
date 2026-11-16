@@ -9,8 +9,8 @@ import (
 	"io/fs"
 	"slices"
 
-	"github.com/home-mandate/spec/relay"
-	"github.com/home-mandate/spec/relay/internal/frames"
+	"github.com/home-mandate/relay-spec"
+	"github.com/home-mandate/relay-spec/internal/frames"
 )
 
 // Files of the cases the class relay plays.

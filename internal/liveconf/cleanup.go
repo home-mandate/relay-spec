@@ -10,7 +10,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/home-mandate/spec/relay/internal/metadata"
+	"github.com/home-mandate/relay-spec/internal/metadata"
 )
 
 // cleanupInstallations unpairs every installation of the state file that is not unpaired yet,

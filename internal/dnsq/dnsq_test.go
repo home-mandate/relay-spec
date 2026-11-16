@@ -11,9 +11,9 @@ import (
 
 	"golang.org/x/net/dns/dnsmessage"
 
-	"github.com/home-mandate/spec/relay/internal/dnsq"
-	"github.com/home-mandate/spec/relay/internal/netguard"
-	"github.com/home-mandate/spec/relay/internal/refdns"
+	"github.com/home-mandate/relay-spec/internal/dnsq"
+	"github.com/home-mandate/relay-spec/internal/netguard"
+	"github.com/home-mandate/relay-spec/internal/refdns"
 )
 
 const zone = "homes.example.org"

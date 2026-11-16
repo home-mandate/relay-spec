@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/enroll"
-	"github.com/home-mandate/spec/relay/internal/refop"
+	"github.com/home-mandate/relay-spec/internal/enroll"
+	"github.com/home-mandate/relay-spec/internal/refop"
 )
 
 // world is a reference operator with a client for its enrollment endpoint.

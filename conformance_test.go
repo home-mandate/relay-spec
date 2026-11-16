@@ -9,8 +9,8 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
+	"github.com/home-mandate/relay-spec"
 	"github.com/home-mandate/spec/manifest"
-	"github.com/home-mandate/spec/relay"
 )
 
 // conformanceSchemas maps every conformance file of the Relay Specification to its schema.
@@ -33,7 +33,7 @@ var conformanceSchemas = map[string]string{
 }
 
 func TestRelayManifestIsUpToDate(t *testing.T) {
-	data, err := os.ReadFile(relay.ManifestLayout.Path[len("relay/"):])
+	data, err := os.ReadFile(relay.ManifestLayout.Path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestRelayManifestIsUpToDate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	built, err := relay.ManifestLayout.Build(os.DirFS(".."))
+	built, err := relay.ManifestLayout.Build(os.DirFS("."))
 	if err != nil {
 		t.Fatal(err)
 	}

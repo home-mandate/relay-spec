@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/home-mandate/spec/relay"
-	"github.com/home-mandate/spec/relay/internal/enroll"
-	"github.com/home-mandate/spec/relay/internal/enrollcases"
+	"github.com/home-mandate/relay-spec"
+	"github.com/home-mandate/relay-spec/internal/enroll"
+	"github.com/home-mandate/relay-spec/internal/enrollcases"
 )
 
 // sequence plays the steps in the order the pairing codes ask for: everything that needs a

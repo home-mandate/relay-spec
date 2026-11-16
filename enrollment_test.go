@@ -270,7 +270,7 @@ func TestInvalidEnrollmentMessagesAreRejected(t *testing.T) {
 }
 
 func TestEnrollmentSchemaDefinesEveryErrorOfTheTable(t *testing.T) {
-	spec, err := os.ReadFile("../RELAY-v0.md")
+	spec, err := os.ReadFile("RELAY-v0.md")
 	if err != nil {
 		t.Fatal(err)
 	}

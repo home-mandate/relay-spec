@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/refop"
-	"github.com/home-mandate/spec/relay/internal/refrelay"
+	"github.com/home-mandate/relay-spec/internal/refop"
+	"github.com/home-mandate/relay-spec/internal/refrelay"
 )
 
 // serveRelay starts a reference operator with a reference relay that shows the faults.

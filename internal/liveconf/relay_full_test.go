@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/refop"
-	"github.com/home-mandate/spec/relay/internal/refrelay"
+	"github.com/home-mandate/relay-spec/internal/refop"
+	"github.com/home-mandate/relay-spec/internal/refrelay"
 )
 
 // serveFull is a reference operator and relay with the real unpairing.

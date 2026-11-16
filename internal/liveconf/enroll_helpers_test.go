@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/home-mandate/spec/relay/internal/refop"
+	"github.com/home-mandate/relay-spec/internal/refop"
 )
 
 // TestHookHelper is the DNS hook of the tests: the test binary, called with

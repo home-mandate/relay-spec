@@ -12,11 +12,11 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/home-mandate/relay-spec"
+	"github.com/home-mandate/relay-spec/internal/enroll"
+	"github.com/home-mandate/relay-spec/internal/enrollcases"
+	"github.com/home-mandate/relay-spec/internal/refop"
 	"github.com/home-mandate/spec/jws"
-	"github.com/home-mandate/spec/relay"
-	"github.com/home-mandate/spec/relay/internal/enroll"
-	"github.com/home-mandate/spec/relay/internal/enrollcases"
-	"github.com/home-mandate/spec/relay/internal/refop"
 )
 
 func TestLoadReadsTheEmbeddedCases(t *testing.T) {

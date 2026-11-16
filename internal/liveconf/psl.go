@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/net/publicsuffix"
 
-	"github.com/home-mandate/spec/relay/internal/metadata"
+	"github.com/home-mandate/relay-spec/internal/metadata"
 )
 
 // parentDomain returns the domain without its first label.

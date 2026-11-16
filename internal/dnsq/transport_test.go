@@ -14,8 +14,8 @@ import (
 
 	"golang.org/x/net/dns/dnsmessage"
 
-	"github.com/home-mandate/spec/relay/internal/dnsq"
-	"github.com/home-mandate/spec/relay/internal/netguard"
+	"github.com/home-mandate/relay-spec/internal/dnsq"
+	"github.com/home-mandate/relay-spec/internal/netguard"
 )
 
 // truncatingServer answers every UDP query with an answer that is cut (TC), so that the query is

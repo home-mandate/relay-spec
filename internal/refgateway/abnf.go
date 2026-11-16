@@ -9,7 +9,7 @@ import (
 
 // Property is the value of an issue or issuewild property read by the grammar of RFC 8659
 // section 4.2. It is written from the ABNF alone, as a regular expression, and is not the code
-// of the tool (relay/internal/dnsq); a test compares the two.
+// of the tool (internal/dnsq); a test compares the two.
 type Property struct {
 	// Domain is the issuer domain name in lower case, empty if there is none.
 	Domain string

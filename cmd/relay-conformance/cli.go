@@ -13,7 +13,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/home-mandate/spec/relay/internal/liveconf"
+	"github.com/home-mandate/relay-spec/internal/liveconf"
 )
 
 const usage = `usage:

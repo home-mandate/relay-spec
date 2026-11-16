@@ -44,7 +44,7 @@
             "description": "The JWS in compact serialization, as sent."
           },
           "key": {
-            "description": "The public key the verifier holds for kid, in the form of $defs/jwk of relay/schema/enrollment-v0.schema.json; null when the header is to carry the key as jwk (pairing requests and key changes).",
+            "description": "The public key the verifier holds for kid, in the form of $defs/jwk of schema/enrollment-v0.schema.json; null when the header is to carry the key as jwk (pairing requests and key changes).",
             "oneOf": [
               {
                 "type": "null"

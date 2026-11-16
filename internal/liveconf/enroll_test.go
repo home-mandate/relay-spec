@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/refop"
+	"github.com/home-mandate/relay-spec/internal/refop"
 )
 
 func TestCleanReferencePassesEnrollmentAndDNS(t *testing.T) {

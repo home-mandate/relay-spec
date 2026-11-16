@@ -9,13 +9,13 @@ import (
 	"github.com/home-mandate/spec/manifest"
 )
 
-// ManifestLayout says which files relay/conformance/manifest.json lists, with paths relative to
-// the root of the repository.
+// ManifestLayout says which files conformance/manifest.json lists, with paths relative to the
+// root of the repository.
 var ManifestLayout = manifest.Layout{
 	Spec:    "relay-v0",
-	Path:    "relay/conformance/manifest.json",
-	Roots:   []string{"relay/conformance", "relay/examples", "relay/schema"},
-	CaseDir: "relay/conformance",
+	Path:    "conformance/manifest.json",
+	Roots:   []string{"conformance", "examples", "schema"},
+	CaseDir: "conformance",
 }
 
 // Paths within FS.
@@ -34,7 +34,7 @@ const (
 var files embed.FS
 
 // FS returns the embedded schemas, examples and conformance cases of the Relay
-// Specification, read-only. Paths are relative to the directory relay/ of the repository.
+// Specification, read-only. Paths are relative to the root of the repository.
 func FS() fs.FS {
 	return files
 }

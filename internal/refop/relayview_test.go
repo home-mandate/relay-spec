@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/home-mandate/spec/relay/internal/enroll"
-	"github.com/home-mandate/spec/relay/internal/refop"
-	"github.com/home-mandate/spec/relay/internal/refrelay"
+	"github.com/home-mandate/relay-spec/internal/enroll"
+	"github.com/home-mandate/relay-spec/internal/refop"
+	"github.com/home-mandate/relay-spec/internal/refrelay"
 )
 
 // TestTheOperatorIsTheRegistryOfItsRelay: the pin of the relay is in the metadata, the names and

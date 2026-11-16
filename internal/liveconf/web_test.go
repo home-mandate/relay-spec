@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/netguard"
-	"github.com/home-mandate/spec/relay/internal/refop"
+	"github.com/home-mandate/relay-spec/internal/netguard"
+	"github.com/home-mandate/relay-spec/internal/refop"
 )
 
 func okHandler(body string) http.Handler {

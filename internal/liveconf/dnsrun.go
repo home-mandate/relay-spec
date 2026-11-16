@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/net/dns/dnsmessage"
 
-	"github.com/home-mandate/spec/relay/internal/dnsq"
+	"github.com/home-mandate/relay-spec/internal/dnsq"
 )
 
 const maxTTL = 3600

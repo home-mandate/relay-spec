@@ -11,7 +11,7 @@ import (
 	"net/netip"
 )
 
-// relayProxyDescription is the description of relay/conformance/proxy-v0.json.
+// relayProxyDescription is the description of conformance/proxy-v0.json.
 const relayProxyDescription = "The PROXY protocol version 2 header at the start of a bound data connection, as a gateway reads it, " +
 	"RELAY-v0.md section 4.6. Each case: everything the gateway receives on the connection, in hex, up to the end of the stream " +
 	"(a header that is cut off is never completed), and the decision. accepted: the gateway uses the source address and port and " +
@@ -32,7 +32,7 @@ type proxySource struct {
 	Port    int    `json:"port"`
 }
 
-// relayProxyCase is a case of relay/conformance/proxy-v0.json.
+// relayProxyCase is a case of conformance/proxy-v0.json.
 type relayProxyCase struct {
 	ID       string       `json:"id"`
 	Section  string       `json:"section"`

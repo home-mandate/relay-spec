@@ -2,7 +2,7 @@
 
 // Package frames checks frames of the tunnel protocol (RELAY-v0 sections 4.3, 4.4 and 4.7)
 // and the binding of a data connection (section 4.5). It is the reference for the cases in
-// relay/conformance/frames-v0.json and relay/conformance/binding-v0.json, used only by tests.
+// conformance/frames-v0.json and conformance/binding-v0.json, used only by tests.
 package frames
 
 import (

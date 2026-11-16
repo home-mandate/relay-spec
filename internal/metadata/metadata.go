@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package metadata checks the rules of the operator metadata (RELAY-v0 section 3) that the
-// schema relay/schema/metadata-v0.schema.json cannot express. It is the reference for the
-// cases in relay/conformance/metadata-v0.json; a document is valid if it is valid against
+// schema schema/metadata-v0.schema.json cannot express. It is the reference for the
+// cases in conformance/metadata-v0.json; a document is valid if it is valid against
 // the schema and Check accepts it.
 package metadata
 

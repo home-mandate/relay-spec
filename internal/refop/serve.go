@@ -19,7 +19,7 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/home-mandate/spec/relay"
+	"github.com/home-mandate/relay-spec"
 )
 
 func fsReadFile(name string) ([]byte, error) { return fs.ReadFile(relay.FS(), name) }

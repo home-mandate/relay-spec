@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/tunnelcert"
+	"github.com/home-mandate/relay-spec/internal/tunnelcert"
 )
 
 // Mem is a registry in memory with a tunnel CA of its own, for tests of the relay and of the

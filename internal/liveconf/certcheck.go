@@ -11,7 +11,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/tunnelcert"
+	"github.com/home-mandate/relay-spec/internal/tunnelcert"
 )
 
 const (

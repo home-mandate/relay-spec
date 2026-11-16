@@ -17,9 +17,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/frames"
-	"github.com/home-mandate/spec/relay/internal/netguard"
-	"github.com/home-mandate/spec/relay/internal/tunnelclient"
+	"github.com/home-mandate/relay-spec/internal/frames"
+	"github.com/home-mandate/relay-spec/internal/netguard"
+	"github.com/home-mandate/relay-spec/internal/tunnelclient"
 )
 
 func TestTheCaseFilesOfTheClassRelayAreComplete(t *testing.T) {

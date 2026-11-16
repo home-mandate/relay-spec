@@ -17,9 +17,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/frames"
-	"github.com/home-mandate/spec/relay/internal/refop"
-	"github.com/home-mandate/spec/relay/internal/tunnelclient"
+	"github.com/home-mandate/relay-spec/internal/frames"
+	"github.com/home-mandate/relay-spec/internal/refop"
+	"github.com/home-mandate/relay-spec/internal/tunnelclient"
 )
 
 // serveStub starts a relay of this test only: it speaks TLS as section 4.2 says, accepts every

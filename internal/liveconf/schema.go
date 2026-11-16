@@ -9,7 +9,7 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
-	"github.com/home-mandate/spec/relay"
+	"github.com/home-mandate/relay-spec"
 )
 
 const enrollmentSchemaID = "https://home-mandate.org/relay-enrollment/v0/enrollment.schema.json"

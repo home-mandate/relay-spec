@@ -5,7 +5,7 @@ package refop
 import (
 	"crypto/x509"
 
-	"github.com/home-mandate/spec/relay/internal/refrelay"
+	"github.com/home-mandate/relay-spec/internal/refrelay"
 )
 
 // The operator is the registry of its reference relay (refrelay.Registry).

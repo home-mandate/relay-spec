@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/home-mandate/spec/relay/internal/dnsq"
-	"github.com/home-mandate/spec/relay/internal/enroll"
+	"github.com/home-mandate/relay-spec/internal/dnsq"
+	"github.com/home-mandate/relay-spec/internal/enroll"
 )
 
 const (
@@ -245,7 +245,7 @@ func randomCode() string {
 	return string(raw)
 }
 
-// accountPrefixes are the prefixes of the ACME account URIs of the CAs of relay/cas.md; a test
+// accountPrefixes are the prefixes of the ACME account URIs of the CAs of cas.md; a test
 // compares them with that file.
 var accountPrefixes = map[string]string{
 	"letsencrypt.org": "https://acme-v02.api.letsencrypt.org/acme/acct/",
