@@ -1620,6 +1620,11 @@ A household that wants less of this runs its gateway without a relay.
   SPEC-v0; the rules of SPEC-v0 Section 11.7 apply to it whichever way it is reached.
 - **Until frozen.** Before the freeze, a new minor version may change any message, schema, case or
   rule of this document; the Changelog says what changed and what an implementation has to do.
+- **The audit events stay.** The audit format `audit/v1` of SPEC-v0 is fixed with SPEC-v0 v0.2.0
+  and records what a gateway observes (Section 12). Until SPEC-v0 has an audit version 2, a change
+  to this document keeps within the events, members and values of audit/v1: a new cause, check or
+  reason maps to one audit/v1 already has, or triggers no event, and Section 12 says which. A
+  change that needs a new value waits for audit version 2.
 - **Freeze.** This specification is frozen from the first release after a relay and a gateway,
   implemented independently from this text, have worked together and passed the conformance tests
   of Section 8. From then on the rules of SPEC-v0 Section 14 apply to its formats in the same way:
@@ -1645,8 +1650,8 @@ audit/v1 cannot record does not follow the schemas of this document and is not u
 The `actor` of an entry is the administrator, of kind `user`, for `relay.paired`, for
 `relay.unpaired` with `cause` `local` and for `relay.pins_changed` with `source` `admin`; for
 `relay.acme_account_changed` with `change` `confirmed`, the human who confirmed the account if
-the gateway knows who. Every other entry is caused by the relay or the operator and names no
-`actor` (SPEC-v0 Section 9.2).
+the gateway knows who. Every other entry names no `actor`,
+whether the relay, the operator or the gateway itself caused it (SPEC-v0 Section 9.2).
 
 The relay and the operator can trigger some events again and again. The gateway writes every
 entry at once, but within 60 minutes at most one entry of `relay.status_changed` for each
@@ -1687,6 +1692,9 @@ the household as the sections say:
 
 ### Unreleased
 
+- Section 11: until the core has an audit version 2, a change to this document keeps within the
+  events, members and values of audit/v1. Section 12 says that every entry without the
+  administrator as `actor` names none, whoever caused it.
 - Values a gateway records fit audit/v1 of the core: `acme_account` has at most 508 characters,
   and a `time` such as `replacement_pending_until` is a date that exists, without the year
   `0000` and without a second 60; a message with another value does not follow the schemas.
