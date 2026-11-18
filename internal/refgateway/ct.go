@@ -38,8 +38,10 @@ const (
 	CTAckFirstOnly                          // an acknowledgement ends the alarm for the first certificate of a digest only
 	CTAckKeysIgnored                        // acknowledged public keys count for nothing
 	CTAckKeysAny                            // any acknowledged public key ends the alarms for all certificates
-	CTPresentedIgnored                      // the key read again from the public origin counts for nothing
-	CTPresentedAny                          // a key read again from the public origin ends the alarms for all certificates
+	CTPresentedTaken                        // a presented key that differs from the current one recognises its certificates
+	CTPresentedAny                          // a presented key ends the alarms for all certificates
+	CTSCTIgnored                            // without a time from a source, the first sight counts, not the earliest SCT
+	CTSCTFirst                              // the earliest SCT counts before the time a source reports
 )
 
 // ServerKeys are the gateway's server keys.
@@ -63,7 +65,11 @@ type Certificate struct {
 	NotBefore string   `json:"not_before"`
 	NotAfter  string   `json:"not_after"`
 	PublicKey string   `json:"public_key"`
-	Logged    string   `json:"logged"`
+	// Logged is the time of the first log entry as a source reports it; EarliestSCT and
+	// FirstSeen count, in this order, when it is absent (SPEC-v0 section 11.7 item 7).
+	Logged      string `json:"logged,omitempty"`
+	EarliestSCT string `json:"earliest_sct,omitempty"`
+	FirstSeen   string `json:"first_seen,omitempty"`
 }
 
 // CTInput is the input of a case of conformance/ct-v0.json in the root of the repository.
@@ -76,8 +82,9 @@ type CTInput struct {
 	// AcknowledgedKeys are public keys the administrator acknowledged: every certificate for
 	// one of them is the gateway's own.
 	AcknowledgedKeys []string `json:"acknowledged_keys,omitempty"`
-	// PresentedKey is the key read again from the public origin before an alarm; a
-	// certificate for it is the gateway's own.
+	// PresentedKey is the key presented under the public origin at the time of the check. It
+	// recognises nothing unless it is the current key: whoever controls the path can present
+	// the key of a certificate they obtained (SPEC-v0 section 11.7 item 7).
 	PresentedKey string        `json:"presented_key,omitempty"`
 	Certificates []Certificate `json:"certificates"`
 }
@@ -96,7 +103,7 @@ type times struct{ since, now, notBefore, notAfter, logged time.Time }
 func CTAlarms(in CTInput, f CTFault) ([]CTResult, error) {
 	out := make([]CTResult, 0, len(in.Certificates))
 	for i, c := range in.Certificates {
-		t, err := parseTimes(in, c)
+		t, err := parseTimes(in, c, f)
 		if err != nil {
 			return nil, err
 		}
@@ -109,18 +116,36 @@ func CTAlarms(in CTInput, f CTFault) ([]CTResult, error) {
 	return out, nil
 }
 
-func parseTimes(in CTInput, c Certificate) (times, error) {
+func parseTimes(in CTInput, c Certificate, f CTFault) (times, error) {
 	var t times
 	var err error
 	for _, x := range []struct {
 		to   *time.Time
 		text string
-	}{{&t.since, in.Since}, {&t.now, in.Now}, {&t.notBefore, c.NotBefore}, {&t.notAfter, c.NotAfter}, {&t.logged, c.Logged}} {
+	}{{&t.since, in.Since}, {&t.now, in.Now}, {&t.notBefore, c.NotBefore}, {&t.notAfter, c.NotAfter}, {&t.logged, loggedOf(c, f)}} {
 		if *x.to, err = time.Parse(time.RFC3339, x.text); err != nil {
 			return t, err
 		}
 	}
 	return t, nil
+}
+
+// loggedOf is the time of the first log entry of a certificate: as a source reports it, or
+// else the earliest timestamp of its embedded SCTs, or else the time the gateway first saw it.
+func loggedOf(c Certificate, f CTFault) string {
+	sct := c.EarliestSCT
+	if f.Has(CTSCTIgnored) {
+		sct = ""
+	}
+	if f.Has(CTSCTFirst) && sct != "" {
+		return sct
+	}
+	for _, t := range []string{c.Logged, sct, c.FirstSeen} {
+		if t != "" {
+			return t
+		}
+	}
+	return ""
 }
 
 // earlierTimes maps the public key of each earlier server key to the time it was replaced.
@@ -180,14 +205,15 @@ func acknowledged(in CTInput, index int, f CTFault) bool {
 	return false
 }
 
-// ownByKey: the certificate is for a public key the administrator acknowledged, or for the
-// key read again from the public origin before an alarm (SPEC-v0 section 11.7 item 7).
+// ownByKey: the certificate is for a public key the administrator acknowledged (SPEC-v0
+// section 11.7 item 7). The key presented under the public origin recognises nothing of its
+// own: it counts only once it is the current key, which isOwn decides.
 func ownByKey(in CTInput, c Certificate, f CTFault) bool {
 	if len(in.AcknowledgedKeys) > 0 && !f.Has(CTAckKeysIgnored) &&
 		(f.Has(CTAckKeysAny) || slices.Contains(in.AcknowledgedKeys, c.PublicKey)) {
 		return true
 	}
-	return in.PresentedKey != "" && !f.Has(CTPresentedIgnored) && (f.Has(CTPresentedAny) || c.PublicKey == in.PresentedKey)
+	return in.PresentedKey != "" && (f.Has(CTPresentedAny) || f.Has(CTPresentedTaken) && c.PublicKey == in.PresentedKey)
 }
 
 // classify: a certificate that expired before the check is a past exposure.

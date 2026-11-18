@@ -209,7 +209,7 @@
     },
     {
       "path": "schema/enrollment-v0.schema.json",
-      "sha256": "43ecb4fd2e6dac879024994691021534effba2838cff0c67bb65de81d2ca6f91"
+      "sha256": "cd82d553ebeeb7f1fbfc7d4f37877ba40ab2bd9d5d59d6c602af38b3488f66a7"
     },
     {
       "path": "schema/metadata-v0.schema.json",
