@@ -55,6 +55,9 @@ func loadJSON(t *testing.T, path string) any {
 func compileEnrollmentDef(t *testing.T, def string) *jsonschema.Schema {
 	t.Helper()
 	c := jsonschema.NewCompiler()
+	// A reader asserts the formats the schemas name, such as date-time for a time (RELAY-v0
+	// section 12: a date that does not exist cannot be recorded).
+	c.AssertFormat()
 	for id, path := range map[string]string{metadataSchemaID: metadataSchemaPath, enrollmentSchemaID: enrollmentSchemaPath} {
 		if err := c.AddResource(id, loadJSON(t, path)); err != nil {
 			t.Fatal(err)

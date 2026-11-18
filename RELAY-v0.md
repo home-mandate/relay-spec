@@ -1636,6 +1636,18 @@ later. A message the gateway ignores or refuses triggers no event, except where 
 Where an event is recorded "once", the gateway keeps what it last recorded durably, across
 restarts, until the pairing ends.
 
+Every value the gateway copies from a message into an entry is bounded as audit/v1 bounds it:
+an `acme_account` has at most 508 characters, and a time such as `replacement_pending_until` is
+a date that exists, without the year `0000` and without a second 60. A message with a value
+audit/v1 cannot record does not follow the schemas of this document and is not used; the alarm
+`foreign` against an operator can therefore always be recorded.
+
+The `actor` of an entry is the administrator, of kind `user`, for `relay.paired`, for
+`relay.unpaired` with `cause` `local` and for `relay.pins_changed` with `source` `admin`; for
+`relay.acme_account_changed` with `change` `confirmed`, the human who confirmed the account if
+the gateway knows who. Every other entry is caused by the relay or the operator and names no
+`actor` (SPEC-v0 Section 9.2).
+
 The relay and the operator can trigger some events again and again. The gateway writes every
 entry at once, but within 60 minutes at most one entry of `relay.status_changed` for each
 `status`, of `relay.caa_alarm` for each `scope`, of `relay.pairing_refused` for each `check` and of
@@ -1654,7 +1666,7 @@ of `until`, and `relay.pins_changed` from the relay is bounded by the limit of S
 | `relay.pin_mismatch` | none | no stored pin matches the key the relay presents (Sections 4.9 and 6.8): once, and again only after a control connection whose handshake matched a stored pin |
 | `relay.protection_changed` | `name`, `level`, `previous_level` | the protection level the gateway determines for an own-domain name (Section 6.5) differs from the level it determined last, a failed lookup included, since it gives `standard`; `level` and `previous_level` are `standard` or `own_domain`. The first determination after the name is registered is recorded too, without `previous_level` |
 | `relay.caa_alarm` | `name`, `scope` | the gateway raises the alarm of Section 6.7: `scope` is `name` for the standard name and `apex` for the apex of the name domain, `name` the name queried. It records the alarm once for each `scope`, and again only after a check of that name showed no difference; records that change from one difference to another raise no second entry |
-| `relay.acme_account_changed` | `account`, `change` | the state of the gateway's account report changes (Section 5.6), with `account` the account URI of the pair concerned and `change`: `reported` when a report is answered with `200` and the reported pair is in force, also a report of the pair in force that withdraws a pending one; `pending` when a report is answered with `confirmation-required`, again for a later report that replaces the pending one; `confirmed` when the gateway, with a report pending, reads its installation and finds that pair in force; `not_confirmed` once, when 7 days after the latest pending report it still sees another pair in force; `foreign` once for each pair in force that the gateway never reported, the alarm of Section 5.6. A report of the pair in force while nothing is pending is no change |
+| `relay.acme_account_changed` | `account`, `caa_identity`, `change` | the state of the gateway's account report changes (Section 5.6), with `account` and `caa_identity` the pair concerned and `change`: `reported` when a report is answered with `200` and the reported pair is in force, also a report of the pair in force that withdraws a pending one; `pending` when a report is answered with `confirmation-required`, again for a later report that replaces the pending one; `confirmed` when the gateway, with a report pending, reads its installation and finds that pair in force; `not_confirmed` once, when 7 days after the latest pending report it still sees another pair in force; `foreign` once for each pair in force that the gateway never reported, the alarm of Section 5.6. A report of the pair in force while nothing is pending is no change |
 | `relay.monitoring_status` | `check`, `status`, `previous_status` | whether monitoring is possible changes (Section 6.7), for each `check` on its own: `caa` for the queries of the CAA records, `installation` for the reads of the installation. `status` is `unavailable` when 24 hours have passed without a successful one and `ok` again at the next success; both start as `ok` at the pairing, and the 24 hours run from the pairing or the last success, across restarts and while remote access is turned off. The state of Certificate Transparency monitoring is the event `ct.status` of SPEC-v0 |
 | `relay.key_changed` | `home_id` | the operator answers a key change with `200`, or the gateway learns in a recovery that the new key is in force (Section 5.5) |
 | `relay.replacement_pending` | `home_id`, `until` | the gateway reads `replacement_pending_until` in its installation (Sections 5.2 and 5.3), with `until` its value: once for each value that differs from the last one recorded |
@@ -1675,6 +1687,13 @@ the household as the sections say:
 
 ### Unreleased
 
+- Values a gateway records fit audit/v1 of the core: `acme_account` has at most 508 characters,
+  and a `time` such as `replacement_pending_until` is a date that exists, without the year
+  `0000` and without a second 60; a message with another value does not follow the schemas.
+  Section 12 names `caa_identity` in `relay.acme_account_changed` and the `actor` of each event.
+- Certificate Transparency: the reference gateway follows the core, where a key presented under
+  the public origin recognises no certificate (`t47`, `t49`) and a certificate's time comes from
+  a source, the earliest SCT or the first sight (`t50` to `t52`); each new fault fails its cases.
 - New Section 12: each `relay.*` event of the audit format `audit/v1` of SPEC-v0 v0.2.0 is mapped
   to the event of this document that triggers it, with the causes for the end of a pairing, the
   states of an ACME account report, whether monitoring is possible, a key change, a pending
