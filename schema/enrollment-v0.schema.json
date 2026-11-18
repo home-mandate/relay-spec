@@ -41,9 +41,17 @@
       "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
     },
     "time": {
-      "description": "RFC 3339 in UTC, whole seconds, ending in Z.",
+      "description": "RFC 3339 in UTC, whole seconds, ending in Z; a date that exists, no year 0000 and no second 60, so that the audit format audit/v1 of the core can record it (RELAY-v0 section 12).",
       "type": "string",
-      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+      "format": "date-time",
+      "pattern": "^([1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+    },
+    "acme_account_url": {
+      "description": "An ACME account URI: an https_url of at most 508 characters, as the audit format audit/v1 of the core records it (RELAY-v0 section 12).",
+      "allOf": [
+        { "$ref": "#/$defs/https_url" },
+        { "maxLength": 508 }
+      ]
     },
     "home_id": {
       "type": "string",
@@ -274,7 +282,7 @@
           "$ref": "#/$defs/https_url"
         },
         "acme_account": {
-          "$ref": "#/$defs/https_url"
+          "$ref": "#/$defs/acme_account_url"
         },
         "caa_identity": {
           "$ref": "#/$defs/domain"
@@ -344,7 +352,7 @@
           ],
           "properties": {
             "acme_account": {
-              "$ref": "#/$defs/https_url"
+              "$ref": "#/$defs/acme_account_url"
             },
             "caa_identity": {
               "$ref": "#/$defs/domain"

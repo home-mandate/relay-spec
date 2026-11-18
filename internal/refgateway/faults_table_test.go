@@ -310,6 +310,8 @@ var ctFaults = []struct {
 	{"CTAckFirstOnly", refgateway.CTAckFirstOnly},
 	{"CTAckKeysIgnored", refgateway.CTAckKeysIgnored},
 	{"CTAckKeysAny", refgateway.CTAckKeysAny},
-	{"CTPresentedIgnored", refgateway.CTPresentedIgnored},
+	{"CTPresentedTaken", refgateway.CTPresentedTaken},
 	{"CTPresentedAny", refgateway.CTPresentedAny},
+	{"CTSCTIgnored", refgateway.CTSCTIgnored},
+	{"CTSCTFirst", refgateway.CTSCTFirst},
 }

@@ -217,6 +217,18 @@ func TestInvalidEnrollmentMessagesAreRejected(t *testing.T) {
 		}},
 		"update own domain and status":              {"examples/installation-update-own-domain.json", "installation_update", func(d obj) { d["status"] = "unpaired" }},
 		"installation account without caa identity": {"examples/installation.json", "installation", func(d obj) { delete(d, "caa_identity") }},
+		// audit/v1 of the core records these values; one it cannot record is no valid message
+		// (RELAY-v0 section 12).
+		"installation account of 509 characters": {"examples/installation.json", "installation", func(d obj) {
+			d["acme_account"] = "https://acme.example/" + strings.Repeat("a", 509-len("https://acme.example/"))
+		}},
+		"update account of 509 characters": {"examples/installation-update-acme.json", "installation_update", func(d obj) {
+			d["acme_account"] = "https://acme.example/" + strings.Repeat("a", 509-len("https://acme.example/"))
+		}},
+		"replacement time with second 60":           {"examples/installation.json", "installation", func(d obj) { d["replacement_pending_until"] = "2026-10-21T08:00:60Z" }},
+		"replacement time in the year 0000":         {"examples/installation.json", "installation", func(d obj) { d["replacement_pending_until"] = "0000-10-21T08:00:00Z" }},
+		"replacement time on February 30":           {"examples/installation.json", "installation", func(d obj) { d["replacement_pending_until"] = "2026-02-30T08:00:00Z" }},
+		"replacement time in month 13":              {"examples/installation.json", "installation", func(d obj) { d["replacement_pending_until"] = "2026-13-01T08:00:00Z" }},
 		"installation caa identity without account": {"examples/installation.json", "installation", func(d obj) { delete(d, "acme_account") }},
 		"installation status removed":               {"examples/installation.json", "installation", func(d obj) { d["status"] = "removed" }},
 		"installation caa identity with port":       {"examples/installation.json", "installation", func(d obj) { d["caa_identity"] = "acme.example:443" }},
