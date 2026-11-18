@@ -61,8 +61,8 @@
     },
     {
       "path": "conformance/pins-v0.json",
-      "sha256": "7d249bdbc2dab345408a493257ff596d9d4560c99c23c1c6ea79f41cb1dca624",
-      "cases": 47
+      "sha256": "2ec6881316ea9faa09ae00c26f64e31b2f3c060cfdca25d9f3333517aa255e50",
+      "cases": 55
     },
     {
       "path": "conformance/protection-level-v0.json",
@@ -120,7 +120,7 @@
     },
     {
       "path": "conformance/schema/pins-v0.schema.json",
-      "sha256": "e09a63c460d129a5f3086a72933ad31421da55c128252a89ed08731348d81a3f"
+      "sha256": "a7b4f87377d7a0be20ac92650278499e9eb86644f91ce14203c04824f86656da"
     },
     {
       "path": "conformance/schema/protection-level-v0.schema.json",

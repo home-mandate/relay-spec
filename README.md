@@ -13,7 +13,8 @@ checks, and what an operator must and must not do. With conformance cases, a liv
 operators and Go reference code.
 
 Status: **draft of the first version (v0.1.0)**, not released yet. It requires the Home-Mandate
-Specification v0.2.0 or later (Section 11.7 "Remote access" there). Versions are the tags
+Specification v0.2.0 or later (Section 11.7 "Remote access" and the audit format `audit/v1`
+there; RELAY-v0 Section 12 maps its `relay.*` events). Versions are the tags
 `vX.Y.Z` of this repository; nothing is frozen before a relay and a gateway have worked
 together (RELAY-v0 Section 11). Home-Mandate Cloud is the first operator to implement it, and
 Home-Mandate for Home Assistant the first gateway.

@@ -16,7 +16,7 @@ import (
 	"github.com/home-mandate/relay-spec/internal/enroll"
 	"github.com/home-mandate/relay-spec/internal/enrollcases"
 	"github.com/home-mandate/relay-spec/internal/refop"
-	"github.com/home-mandate/spec/jws"
+	"github.com/home-mandate/relay-spec/internal/request"
 )
 
 func TestLoadReadsTheEmbeddedCases(t *testing.T) {
@@ -110,7 +110,7 @@ func TestRequestBuildsTheSymbolicParts(t *testing.T) {
 	es.Self.Signer = gen(t, enroll.AlgES256)
 	if _, compact, err := es.Request(with(func(s *enrollcases.Step) { s.Alg, s.Signature = "other", "foreign" }), nonce); err != nil {
 		t.Error(err)
-	} else if h, _, perr := jws.ParseRequest(compact); perr == nil && h.Alg != "EdDSA" {
+	} else if h, _, perr := request.Parse(compact); perr == nil && h.Alg != "EdDSA" {
 		t.Errorf("alg %s", h.Alg)
 	}
 	for name, edit := range map[string]func(*enrollcases.Actors){

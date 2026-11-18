@@ -3,7 +3,7 @@ module github.com/home-mandate/relay-spec
 go 1.27.4
 
 require (
-	github.com/home-mandate/spec v0.1.2-0.20261116064208-547190268267
+	github.com/home-mandate/spec v0.1.2-0.20261118081100-d020c587d580
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	golang.org/x/net v0.62.0
 )

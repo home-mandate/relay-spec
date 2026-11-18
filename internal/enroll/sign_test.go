@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/home-mandate/relay-spec/internal/enroll"
+	"github.com/home-mandate/relay-spec/internal/request"
 	"github.com/home-mandate/spec/jws"
 )
 
@@ -92,16 +93,16 @@ func TestRegularRequestsVerifyWithPackageJWS(t *testing.T) {
 	for _, alg := range []string{enroll.AlgEdDSA, enroll.AlgES256} {
 		s := gen(t, alg)
 		pair := enroll.Spec{Signer: s, JWK: true, Nonce: nonce, URL: pairURL, Payload: `{"code":"X"}`}.Compact()
-		if h, _, err := jws.VerifyRequest(pair, nil); err != nil || h.URL != pairURL || h.JWK == nil {
+		if h, _, err := request.Verify(pair, nil); err != nil || h.URL != pairURL || h.JWK == nil {
 			t.Errorf("%s pair: %v", alg, err)
 		}
 		read := enroll.Spec{Signer: s, Kid: instURL, Nonce: nonce, URL: instURL}.Compact()
-		if h, payload, err := jws.VerifyRequest(read, s.Public()); err != nil || h.Kid != instURL || len(payload) != 0 {
+		if h, payload, err := request.Verify(read, s.Public()); err != nil || h.Kid != instURL || len(payload) != 0 {
 			t.Errorf("%s read: %v", alg, err)
 		}
 		// Signed by another key of the same algorithm: a good spelling, a bad signature.
 		forged := enroll.Spec{Signer: s, SignWith: gen(t, alg), Kid: instURL, Nonce: nonce, URL: instURL}.Compact()
-		if _, _, err := jws.VerifyRequest(forged, s.Public()); !errors.Is(err, jws.ErrSignature) {
+		if _, _, err := request.Verify(forged, s.Public()); !errors.Is(err, request.ErrSignature) {
 			t.Errorf("%s forged: %v", alg, err)
 		}
 	}
@@ -117,25 +118,25 @@ func TestEachDefectIsMalformed(t *testing.T) {
 		"padded payload": enroll.PaddedPayload,
 	} {
 		spec := enroll.Spec{Signer: gen(t, enroll.AlgEdDSA), Kid: instURL, Nonce: nonce, URL: instURL, Payload: `{"own_domain":null}`, Defect: defect}
-		if _, _, err := jws.ParseRequest(spec.Compact()); !errors.Is(err, jws.ErrMalformed) {
+		if _, _, err := request.Parse(spec.Compact()); !errors.Is(err, request.ErrMalformed) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
 	private := enroll.Spec{Signer: gen(t, enroll.AlgEdDSA), JWK: true, Nonce: nonce, URL: pairURL, Payload: `{}`, Defect: enroll.PrivateJWK}
-	if _, _, err := jws.ParseRequest(private.Compact()); !errors.Is(err, jws.ErrMalformed) {
+	if _, _, err := request.Parse(private.Compact()); !errors.Is(err, request.ErrMalformed) {
 		t.Errorf("private jwk: %v", err)
 	}
 	// The higher S matters for ES256 only; for EdDSA the defect changes nothing.
 	for alg, want := range map[string]bool{enroll.AlgES256: true, enroll.AlgEdDSA: false} {
 		spec := enroll.Spec{Signer: gen(t, alg), Kid: instURL, Nonce: nonce, URL: instURL, Defect: enroll.HighS}
-		_, _, err := jws.ParseRequest(spec.Compact())
-		if got := errors.Is(err, jws.ErrMalformed); got != want {
+		_, _, err := request.Parse(spec.Compact())
+		if got := errors.Is(err, request.ErrMalformed); got != want {
 			t.Errorf("%s high S: malformed %v, %v", alg, got, err)
 		}
 	}
 	// An algorithm outside the profile, because an ES256 signature passes the form checks of
 	// EdDSA by chance (its S is below the group order in about one of 16 cases).
-	if _, _, err := jws.ParseRequest(enroll.Spec{Signer: gen(t, enroll.AlgES256), Kid: instURL, Nonce: nonce, URL: instURL, Alg: "RS256"}.Compact()); !errors.Is(err, jws.ErrMalformed) {
+	if _, _, err := request.Parse(enroll.Spec{Signer: gen(t, enroll.AlgES256), Kid: instURL, Nonce: nonce, URL: instURL, Alg: "RS256"}.Compact()); !errors.Is(err, request.ErrMalformed) {
 		t.Errorf("alg override: %v", err)
 	}
 }
@@ -143,7 +144,7 @@ func TestEachDefectIsMalformed(t *testing.T) {
 func TestKeyChangeJWSVerifiesWithPackageJWS(t *testing.T) {
 	old, fresh := gen(t, enroll.AlgEdDSA), gen(t, enroll.AlgES256)
 	inner := enroll.KeyChangeJWS(fresh, old.JWK(), instURL, keyURL)
-	h, payload, err := jws.VerifyKeyChange(inner)
+	h, payload, err := request.VerifyKeyChange(inner)
 	if err != nil || h.URL != keyURL || len(payload) == 0 {
 		t.Fatalf("%v", err)
 	}

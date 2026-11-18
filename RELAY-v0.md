@@ -7,7 +7,8 @@ conformance cases and its reference code are versioned by the tags `vX.Y.Z` of t
 [home-mandate/relay-spec](https://github.com/home-mandate/relay-spec), independently of the
 Home-Mandate Specification ([home-mandate/spec](https://github.com/home-mandate/spec), called
 SPEC-v0 here). Each version names the version of SPEC-v0 it requires; this one requires SPEC-v0
-`v0.2.0` or later, for Section 11.7 "Remote access", and nothing in it is frozen yet (Section 11).
+`v0.2.0` or later, for Section 11.7 "Remote access" and the audit format `audit/v1`
+(Section 12), and nothing in it is frozen yet (Section 11).
 License of this document: CC BY 4.0 (`LICENSE-docs`). Schemas, examples, conformance cases and
 code: Apache 2.0 (`LICENSE`).
 
@@ -32,6 +33,7 @@ a household can trust a relay it does not control:
 | Names and certificates (Section 6) | public names, protection levels, Certificate Transparency monitoring, pinning of the relay |
 | Operator obligations (Section 7) | what a conforming operator MUST do and MUST NOT do |
 | Conformance (Section 8) | how the conformance of an operator is tested, and the access for testing it gives |
+| Audit events of a gateway (Section 12) | which event of this document a gateway records with which `relay.*` event of its audit log |
 
 The specification builds on existing standards:
 
@@ -480,7 +482,18 @@ the pin of the connection (Section 4.1) for each `pins`: a set equal to the stor
 handshake; if not, the set is ignored (`ignored`). A connection never gains the rights of the other
 kind. A set that breaks the rules of Section 6.8 is ignored, and the stored set stays. Otherwise
 the gateway stores the set, durably and as a whole, before it answers `stored`. If a set cannot be
-stored durably, the gateway answers `ignored`. A set need not contain the pin of the connection. If, after a set is stored, the pin of a control connection is no longer stored at
+stored durably, the gateway answers `ignored`. Over a connection whose pin is active, the gateway
+stores at most one new set an hour, over all its control connections together: a set that would
+be stored, differs from the stored one and adds a pin, and arrives less than 60 minutes after the
+last set stored over any connection with an active pin, is answered `ignored`. A set that breaks
+the rules or cannot be stored is ignored for that reason, not for the limit. Only a set stored over
+a connection with an active pin starts the hour; a set that is ignored or equal to the stored one,
+and pins the administrator takes (Section 6.8), do not. The gateway measures the hour in the time
+of day and keeps the time of the last such set durably. A set that only removes pins, and every
+set over a connection with a backup pin, have no limit, so that a leaked active key cannot hold
+up a recovery with a backup key. An operator that rotates an active key announces at most one set
+an hour; a leaked active key that adds a pin can keep it from changing the active pins over an
+active key, and the operator then recovers with a backup key (Section 6.8). A set need not contain the pin of the connection. If, after a set is stored, the pin of a control connection is no longer stored at
 all, the gateway closes that connection, after the answer if the set arrived on it. This holds for every control connection, also when the set arrived on another one. The gateway answers within one heartbeat
 interval. The relay has at most one `pins` unanswered; without an answer within one interval it
 counts the set as not stored, keeps the connection, and MAY send the set again later. A `pins-ack`
@@ -1612,9 +1625,74 @@ A household that wants less of this runs its gateway without a relay.
   of Section 8. From then on the rules of SPEC-v0 Section 14 apply to its formats in the same way:
   an incompatible change needs a new major version.
 
+## 12. Audit events of a gateway
+
+A gateway implements SPEC-v0 and keeps its audit log (SPEC-v0 Section 9). What it observes of its
+pairing it records with the `relay.*` events of the audit format `audit/v1` (SPEC-v0 Section 9.2).
+That format fixes the events, their members and their values; this section says which event of
+this document triggers each of them. Every entry carries `operator`, the operator domain as
+A-labels (Section 2), and the gateway writes it when it makes the decision or learns the fact, not
+later. A message the gateway ignores or refuses triggers no event, except where the table says so.
+Where an event is recorded "once", the gateway keeps what it last recorded durably, across
+restarts, until the pairing ends.
+
+The relay and the operator can trigger some events again and again. The gateway writes every
+entry at once, but within 60 minutes at most one entry of `relay.status_changed` for each
+`status`, of `relay.caa_alarm` for each `scope`, of `relay.pairing_refused` for each `check` and of
+`relay.pins_ignored` for each `reason`, and at most one of `relay.pin_mismatch` and of
+`relay.metadata_pins_unknown`, besides what their rows say; an occurrence within that time is not
+recorded. The 60 minutes run from the last entry of that event and value, in the time of day, and
+the gateway keeps that time durably. `relay.replacement_pending` is recorded once for each value
+of `until`, and `relay.pins_changed` from the relay is bounded by the limit of Section 4.7.
+
+| Event | Members | Recorded when |
+|---|---|---|
+| `relay.paired` | `home_id`, `name` | the gateway accepts the pairing response after the checks of Section 5.2, also with a code for an existing installation; `name` is the standard name, and the `actor` is the administrator who paired (SPEC-v0 Section 9.1). A pairing response that fails a check is no pairing and is not recorded |
+| `relay.unpaired` | `home_id`, `cause` | the pairing ends (Section 5.7), with `cause`: `local` when the gateway unpairs or ends the pairing locally at its administrator's request; `operator` when the operator answers `unpaired` (Section 5.1), whether the household unpaired in the portal, another gateway replaced the installation (Section 5.2) or the service ended (Section 7.9); `offline_too_long` on the answer `offline-too-long` or when the gateway's own limit passed (Section 5.5); `bad_signature` on the answer `bad-signature` outside a key change, or when a key change cannot be recovered with either key (Section 5.5) |
+| `relay.status_changed` | `home_id`, `status`, `previous_status` | the status of the installation that the gateway reads (Section 5.3), or the answer `blocked` (Section 5.1), differs from the status it knew; `status` and `previous_status` are `active`, `paused` or `blocked`. The status it knows first is that of the pairing response. The status `unpaired` is `relay.unpaired` |
+| `relay.pins_changed` | `source`, `active_pins`, `backup_pins` | the gateway stores a new set of pins (Section 6.8): from `pins` over a pinned tunnel connection, answered `stored` with a set that differs from the stored one (`source`: `relay`, Section 4.7), or from the current metadata when its administrator takes them after the warning (`source`: `admin`); `active_pins` and `backup_pins` count the pins stored. The pins of the pairing are part of `relay.paired` |
+| `relay.pin_mismatch` | none | no stored pin matches the key the relay presents (Sections 4.9 and 6.8): once, and again only after a control connection whose handshake matched a stored pin |
+| `relay.protection_changed` | `name`, `level`, `previous_level` | the protection level the gateway determines for an own-domain name (Section 6.5) differs from the level it determined last, a failed lookup included, since it gives `standard`; `level` and `previous_level` are `standard` or `own_domain`. The first determination after the name is registered is recorded too, without `previous_level` |
+| `relay.caa_alarm` | `name`, `scope` | the gateway raises the alarm of Section 6.7: `scope` is `name` for the standard name and `apex` for the apex of the name domain, `name` the name queried. It records the alarm once for each `scope`, and again only after a check of that name showed no difference; records that change from one difference to another raise no second entry |
+| `relay.acme_account_changed` | `account`, `change` | the state of the gateway's account report changes (Section 5.6), with `account` the account URI of the pair concerned and `change`: `reported` when a report is answered with `200` and the reported pair is in force, also a report of the pair in force that withdraws a pending one; `pending` when a report is answered with `confirmation-required`, again for a later report that replaces the pending one; `confirmed` when the gateway, with a report pending, reads its installation and finds that pair in force; `not_confirmed` once, when 7 days after the latest pending report it still sees another pair in force; `foreign` once for each pair in force that the gateway never reported, the alarm of Section 5.6. A report of the pair in force while nothing is pending is no change |
+| `relay.monitoring_status` | `check`, `status`, `previous_status` | whether monitoring is possible changes (Section 6.7), for each `check` on its own: `caa` for the queries of the CAA records, `installation` for the reads of the installation. `status` is `unavailable` when 24 hours have passed without a successful one and `ok` again at the next success; both start as `ok` at the pairing, and the 24 hours run from the pairing or the last success, across restarts and while remote access is turned off. The state of Certificate Transparency monitoring is the event `ct.status` of SPEC-v0 |
+| `relay.key_changed` | `home_id` | the operator answers a key change with `200`, or the gateway learns in a recovery that the new key is in force (Section 5.5) |
+| `relay.replacement_pending` | `home_id`, `until` | the gateway reads `replacement_pending_until` in its installation (Sections 5.2 and 5.3), with `until` its value: once for each value that differs from the last one recorded |
+| `relay.pairing_refused` | `check` | a pairing response fails a check of Section 5.2, so that the gateway does not use the pairing: `check` is `name` when the standard name is not the home ID followed by `.` and the name domain, `certificate` when the tunnel certificate does not match Section 5.4 or the gateway's tunnel key. The error `pairing-refused` of Section 5.1 is no pairing response and triggers no event |
+| `relay.pins_ignored` | `reason` | the gateway answers `ignored` to a `pins` message that is not the stored set (Section 4.7), with `reason`: `rules` when the set breaks the rules of Section 6.8, such as a change of the backup pins over a connection with an active pin; `connection_pin` when the pin of the connection is no longer stored in the kind it had at the handshake; `storage` when the set cannot be stored durably; `limit` when the set is over the limit of Section 4.7 |
+| `relay.metadata_pins_unknown` | none | the gateway fetches metadata whose pins share no pin with the stored set (Sections 3 and 6.8): once for each set of pins in the metadata |
+
+These events of this document trigger no `relay.*` event; the gateway tells its administrator or
+the household as the sections say:
+
+- metadata whose pins share a pin with the stored set (Section 6.8);
+- a CA removed from `acme_cas`, or a CA that no longer meets the conditions (Section 6.6);
+- a gateway that cannot obtain a server certificate (Section 5.6);
+- a CAA record of an own-domain name that has to change after a new ACME account (Section 6.5);
+- the loss of a tunnel connection, and the error responses not named in the table.
+
 ## Changelog
 
 ### Unreleased
+
+- New Section 12: each `relay.*` event of the audit format `audit/v1` of SPEC-v0 v0.2.0 is mapped
+  to the event of this document that triggers it, with the causes for the end of a pairing, the
+  states of an ACME account report, whether monitoring is possible, a key change, a pending
+  replacement, a relay key that matches no pin, and what the gateway refuses: a pairing response
+  that fails a check, a set of pins it ignores and metadata whose pins it does not know. Events
+  that the relay or the operator can trigger again and again are recorded at most once within 60
+  minutes for each value.
+  This version requires SPEC-v0 v0.2.0 for that format.
+- Normative change, Section 4.7: over its connections with an active pin, a gateway stores at
+  most one new set of pins an hour that adds a pin, and answers `ignored` to further sets; a set
+  that only removes pins and a connection with a backup pin have no limit. `pins-v0.json` states
+  the time of a case (`stored_minutes_ago`, `after_minutes`) and the kind of another connection
+  (`kind`), and has cases for the limit (`n56` to `n63`).
+- The reference code reads requests and key changes with its own package, on top of the compact
+  serialization and the signature checks of SPEC-v0's Go module, so that a rule of this document
+  no longer needs a release of the core module. The reference gateway applies the
+  acknowledgement of a public key and the key read again from the public origin of
+  `conformance/ct-v0.json` (SPEC-v0 Section 11.7 item 7).
 
 - This specification moved from home-mandate/spec to its own repository,
   home-mandate/relay-spec, with its own versions (Section 11). Paths lose the prefix `relay/`;

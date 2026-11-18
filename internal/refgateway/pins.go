@@ -13,31 +13,45 @@ type PinFault uint64
 // Defects of the decision on a pins message. The first group accepts what must be ignored,
 // the second ignores or closes what must not be.
 const (
-	PinBackupChange      PinFault = 1 << iota // an active connection may change the backup pins
-	PinNullActive                             // the active pins may be empty
-	PinNullBackup                             // a backup connection may leave the backup pins empty
-	PinOverlap                                // a pin may be in both kinds
-	PinNine                                   // nine pins are allowed
-	PinPerKind                                // at most eight per kind instead of in all
-	PinKindFromCurrent                        // the kind is the one the pin has in the stored set now
-	PinNoPinCheck                             // the pin of the connection need not be stored
-	PinApplyIgnored                           // a set that is answered ignored is stored all the same
-	PinNoClose                                // the connection is never closed
-	PinAlwaysBackup                           // every connection has the rights of a backup pin
-	PinOrderCompare                           // sets are equal only in the same order
-	PinEqualIgnored                           // the same set is answered ignored
-	PinEqualLast                              // equality is checked after the rules
-	PinSwapEqual                              // the kinds exchanged count as the same set
-	PinRequireConnPin                         // the new set must hold the pin of the connection
-	PinCloseOnKindChange                      // the connection is closed when its pin is stored in another kind than at the handshake
-	PinBackupKeepsBackup                      // a backup connection must keep the backup pins
-	PinBackupKeepsActive                      // a backup connection must keep the active pins
-	PinSeven                                  // at most seven pins
-	PinActiveOnlyOne                          // an active connection may announce one active pin only
-	PinOtherNoClose                           // a set stored through another connection closes only the connection it arrived on
-	PinCloseOldSet                            // the connection is closed when its pin is not in the set stored before
-	PinOtherAlwaysClose                       // a set stored through another connection closes this connection whatever it holds
+	PinBackupChange       PinFault = 1 << iota // an active connection may change the backup pins
+	PinNullActive                              // the active pins may be empty
+	PinNullBackup                              // a backup connection may leave the backup pins empty
+	PinOverlap                                 // a pin may be in both kinds
+	PinNine                                    // nine pins are allowed
+	PinPerKind                                 // at most eight per kind instead of in all
+	PinKindFromCurrent                         // the kind is the one the pin has in the stored set now
+	PinNoPinCheck                              // the pin of the connection need not be stored
+	PinApplyIgnored                            // a set that is answered ignored is stored all the same
+	PinNoClose                                 // the connection is never closed
+	PinAlwaysBackup                            // every connection has the rights of a backup pin
+	PinOrderCompare                            // sets are equal only in the same order
+	PinEqualIgnored                            // the same set is answered ignored
+	PinEqualLast                               // equality is checked after the rules
+	PinSwapEqual                               // the kinds exchanged count as the same set
+	PinRequireConnPin                          // the new set must hold the pin of the connection
+	PinCloseOnKindChange                       // the connection is closed when its pin is stored in another kind than at the handshake
+	PinBackupKeepsBackup                       // a backup connection must keep the backup pins
+	PinBackupKeepsActive                       // a backup connection must keep the active pins
+	PinSeven                                   // at most seven pins
+	PinActiveOnlyOne                           // an active connection may announce one active pin only
+	PinOtherNoClose                            // a set stored through another connection closes only the connection it arrived on
+	PinCloseOldSet                             // the connection is closed when its pin is not in the set stored before
+	PinOtherAlwaysClose                        // a set stored through another connection closes this connection whatever it holds
+	PinNoLimit                                 // a connection with an active pin may store new sets at any rate
+	PinLimitBackup                             // the limit also holds for a connection with a backup pin
+	PinLimitExclusive                          // a set exactly an hour after the last one is still over the limit
+	PinLimitEqual                              // the limit also refuses the set that is already stored
+	PinLimitIgnoredCounts                      // an ignored set starts the hour again
+	PinLimitPerConnection                      // the hour runs for each connection, not for the gateway
+	PinLimitRemoval                            // the limit also holds for a set that only removes pins
 )
+
+// limitMinutes: over a connection with an active pin, a gateway stores at most one new set of
+// pins an hour (RELAY-v0 section 4.7).
+const limitMinutes = 60
+
+// minutesPerDay stands for a time that a case does not state: an hour or more.
+const minutesPerDay = 24 * 60
 
 // Pins is a set of pins: SHA-256 digests in base64url.
 type Pins struct {
@@ -71,13 +85,22 @@ type PinStep struct {
 	Connection  string `json:"connection"`
 	// ArrivedOn is "other" for a set that another control connection stored, "" for this one.
 	ArrivedOn string `json:"arrived_on"`
+	// Kind is, for a set stored through another connection, the kind of that connection's pin:
+	// "active" or "backup"; empty when the case does not say.
+	Kind string `json:"kind"`
+	// AfterMinutes is the time since the step before, or for the first step since the start
+	// of the case; nil stands for an hour or more, and for the first step for none.
+	AfterMinutes *int `json:"after_minutes"`
 }
 
 // PinsInput is the input of a pins case.
 type PinsInput struct {
-	Stored        Pins      `json:"stored"`
-	ConnectionPin string    `json:"connection_pin"`
-	Steps         []PinStep `json:"steps"`
+	Stored        Pins   `json:"stored"`
+	ConnectionPin string `json:"connection_pin"`
+	// StoredMinutesAgo is how long before the start of the case the stored set was stored over
+	// a connection with an active pin; nil stands for an hour or more.
+	StoredMinutesAgo *int      `json:"stored_minutes_ago"`
+	Steps            []PinStep `json:"steps"`
 }
 
 // PinOutcome is what the gateway does with one message.
@@ -100,18 +123,72 @@ func RunPins(in PinsInput, f PinFault) ([]PinOutcome, error) {
 		kind = KindBackup
 	}
 	stored := in.Stored
+	since := minutesOr(in.StoredMinutesAgo)
 	out := make([]PinOutcome, 0, len(in.Steps))
-	for _, step := range in.Steps {
+	for i, step := range in.Steps {
+		if i > 0 || step.AfterMinutes != nil {
+			since += minutesOr(step.AfterMinutes)
+		}
 		var o PinOutcome
 		if step.ArrivedOn == "other" {
 			o = storedElsewhere(stored, in.ConnectionPin, kind, step.Pins, f)
+			if step.Kind == "active" && !sameSets(stored, step.Pins, 0) && !f.Has(PinLimitPerConnection) {
+				since = 0
+			}
 		} else {
 			o = Announce(stored, in.ConnectionPin, kind, step.Pins, f)
+			if overLimit(stored, step.Pins, kind, since, o, f) {
+				o = PinOutcome{Answer: "ignored", Stored: stored, Closed: closes(stored, stored, in.ConnectionPin, kind, f)}
+			}
+			if kind == KindActive && (o.Answer == "stored" && !sameSets(stored, step.Pins, 0) || o.Answer == "ignored" && f.Has(PinLimitIgnoredCounts)) {
+				since = 0
+			}
 		}
 		out = append(out, o)
 		stored = o.Stored
 	}
 	return out, nil
+}
+
+// onlyRemoves: every pin of the set is stored in the same kind, so the set only removes pins,
+// which a relay with an active key could do in any case.
+func onlyRemoves(stored, set Pins) bool {
+	for _, p := range set.Active {
+		if !slices.Contains(stored.Active, p) {
+			return false
+		}
+	}
+	for _, p := range set.Backup {
+		if !slices.Contains(stored.Backup, p) {
+			return false
+		}
+	}
+	return true
+}
+
+// minutesOr returns the minutes given, or for none a day, well beyond the limit.
+func minutesOr(minutes *int) int {
+	if minutes == nil {
+		return minutesPerDay
+	}
+	return *minutes
+}
+
+// overLimit: a new set over a connection with an active pin less than an hour after the last
+// set stored over any connection of the gateway with an active pin is ignored; a set that only
+// removes pins and a connection with a backup pin have no limit, so that a leaked active key
+// cannot hold up the recovery (RELAY-v0 section 4.7).
+func overLimit(stored, set Pins, kind Kind, since int, o PinOutcome, f PinFault) bool {
+	if f.Has(PinNoLimit) || kind == KindBackup && !f.Has(PinLimitBackup) || o.Answer != "stored" {
+		return false
+	}
+	if sameSets(stored, set, 0) {
+		return f.Has(PinLimitEqual) && since < limitMinutes
+	}
+	if onlyRemoves(stored, set) && !f.Has(PinLimitRemoval) {
+		return false
+	}
+	return since < limitMinutes || f.Has(PinLimitExclusive) && since == limitMinutes
 }
 
 // storedElsewhere is the effect on this connection of a set that another control connection

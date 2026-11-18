@@ -18,6 +18,7 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
+	"github.com/home-mandate/relay-spec/internal/request"
 	"github.com/home-mandate/spec/jws"
 )
 
@@ -48,7 +49,7 @@ func loadJWSCases(t *testing.T) []jwsCase {
 	return file.Cases
 }
 
-// verdict maps the result of the jws package to the errors of RELAY-v0 section 5.1: header,
+// verdict maps the result of internal/request to the errors of RELAY-v0 section 5.1: header,
 // spelling and url are malformed, a signature that does not verify is bad-signature.
 func verdict(t *testing.T, c jwsCase) string {
 	t.Helper()
@@ -64,20 +65,20 @@ func verdict(t *testing.T, c jwsCase) string {
 	var err error
 	switch c.Kind {
 	case "request":
-		var h jws.RequestHeader
-		h, _, err = jws.VerifyRequest(c.JWS, key)
+		var h request.Header
+		h, _, err = request.Verify(c.JWS, key)
 		url = h.URL
 	case "key-change":
-		var h jws.KeyChangeHeader
-		h, _, err = jws.VerifyKeyChange(c.JWS)
+		var h request.KeyChangeHeader
+		h, _, err = request.VerifyKeyChange(c.JWS)
 		url = h.URL
 	default:
 		t.Fatalf("%s: kind %q", c.ID, c.Kind)
 	}
 	switch {
-	case errors.Is(err, jws.ErrMalformed):
+	case errors.Is(err, request.ErrMalformed):
 		return "malformed"
-	case errors.Is(err, jws.ErrSignature):
+	case errors.Is(err, request.ErrSignature):
 		return "bad-signature"
 	case err != nil:
 		t.Fatalf("%s: %v", c.ID, err)
@@ -129,7 +130,7 @@ var schemaAcceptedJWSHeaders = map[string]string{
 
 // TestJWSHeadersAgreeWithTheSchema: the header of every valid case, and of every
 // malformed case in schemaAcceptedJWSHeaders, is valid against the enrollment schema; the
-// header of every other malformed case is not, so that the jws package and the schema
+// header of every other malformed case is not, so that internal/request and the schema
 // agree in both directions.
 func TestJWSHeadersAgreeWithTheSchema(t *testing.T) {
 	defs := map[string]string{"request": "protected_header", "key-change": "key_change_header"}
