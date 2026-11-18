@@ -36,6 +36,10 @@ const (
 	CTAckByName                             // an acknowledgement also ends the alarm for certificates with the same names
 	CTAckByKey                              // an acknowledgement also ends the alarm for certificates with the same public key
 	CTAckFirstOnly                          // an acknowledgement ends the alarm for the first certificate of a digest only
+	CTAckKeysIgnored                        // acknowledged public keys count for nothing
+	CTAckKeysAny                            // any acknowledged public key ends the alarms for all certificates
+	CTPresentedIgnored                      // the key read again from the public origin counts for nothing
+	CTPresentedAny                          // a key read again from the public origin ends the alarms for all certificates
 )
 
 // ServerKeys are the gateway's server keys.
@@ -64,11 +68,17 @@ type Certificate struct {
 
 // CTInput is the input of a case of conformance/ct-v0.json in the root of the repository.
 type CTInput struct {
-	PublicNames  []string      `json:"public_names"`
-	Since        string        `json:"since"`
-	Now          string        `json:"now"`
-	ServerKeys   ServerKeys    `json:"server_keys"`
-	Acknowledged []string      `json:"acknowledged"`
+	PublicNames  []string   `json:"public_names"`
+	Since        string     `json:"since"`
+	Now          string     `json:"now"`
+	ServerKeys   ServerKeys `json:"server_keys"`
+	Acknowledged []string   `json:"acknowledged"`
+	// AcknowledgedKeys are public keys the administrator acknowledged: every certificate for
+	// one of them is the gateway's own.
+	AcknowledgedKeys []string `json:"acknowledged_keys,omitempty"`
+	// PresentedKey is the key read again from the public origin before an alarm; a
+	// certificate for it is the gateway's own.
+	PresentedKey string        `json:"presented_key,omitempty"`
 	Certificates []Certificate `json:"certificates"`
 }
 
@@ -134,7 +144,7 @@ func decide(in CTInput, index int, t times, earlier map[string]time.Time, f CTFa
 	if f.Has(CTNeverAlarm) {
 		return "none"
 	}
-	if isOwn(in.ServerKeys.Current, earlier, c, t, f) || acknowledged(in, index, f) || !coversAny(in.PublicNames, c.Names, f) {
+	if isOwn(in.ServerKeys.Current, earlier, c, t, f) || ownByKey(in, c, f) || acknowledged(in, index, f) || !coversAny(in.PublicNames, c.Names, f) {
 		return "none"
 	}
 	if f.Has(CTNoLookback) {
@@ -168,6 +178,16 @@ func acknowledged(in CTInput, index int, f CTFault) bool {
 		}
 	}
 	return false
+}
+
+// ownByKey: the certificate is for a public key the administrator acknowledged, or for the
+// key read again from the public origin before an alarm (SPEC-v0 section 11.7 item 7).
+func ownByKey(in CTInput, c Certificate, f CTFault) bool {
+	if len(in.AcknowledgedKeys) > 0 && !f.Has(CTAckKeysIgnored) &&
+		(f.Has(CTAckKeysAny) || slices.Contains(in.AcknowledgedKeys, c.PublicKey)) {
+		return true
+	}
+	return in.PresentedKey != "" && !f.Has(CTPresentedIgnored) && (f.Has(CTPresentedAny) || c.PublicKey == in.PresentedKey)
 }
 
 // classify: a certificate that expired before the check is a past exposure.

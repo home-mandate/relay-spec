@@ -13,6 +13,7 @@ import (
 	"slices"
 	"time"
 
+	relayreq "github.com/home-mandate/relay-spec/internal/request"
 	"github.com/home-mandate/relay-spec/internal/tunnelcert"
 	"github.com/home-mandate/spec/jws"
 )
@@ -233,12 +234,12 @@ func (o *Operator) keyChange(w http.ResponseWriter, req *request) {
 		o.fail(w, "malformed")
 		return
 	}
-	head, payload, err := jws.ParseKeyChange(inner)
+	head, payload, err := relayreq.ParseKeyChange(inner)
 	if err != nil {
 		o.fail(w, "malformed")
 		return
 	}
-	if _, _, err := jws.VerifyKeyChange(inner); err != nil {
+	if _, _, err := relayreq.VerifyKeyChange(inner); err != nil {
 		o.fail(w, "bad-signature")
 		return
 	}

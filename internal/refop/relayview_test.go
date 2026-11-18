@@ -36,6 +36,7 @@ func TestTheOperatorIsTheRegistryOfItsRelay(t *testing.T) {
 	id, paired := w.pair(refop.DefaultCodes[0], enroll.AlgEdDSA)
 	home := paired.Installation.HomeID
 	std := paired.Installation.PublicName
+	//lint:ignore SA1019 the pool is the operator's own, not the system pool, so Subjects lists every root.
 	if r := op.Routes()[std]; r.Home != home || !r.Verified || !op.Active(home) || len(op.Roots().Subjects()) != 1 {
 		t.Errorf("route %+v, active %v", r, op.Active(home))
 	}

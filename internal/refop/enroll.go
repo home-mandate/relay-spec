@@ -12,7 +12,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/home-mandate/spec/jws"
+	relayreq "github.com/home-mandate/relay-spec/internal/request"
 )
 
 const (
@@ -96,7 +96,7 @@ func (o *Operator) fail(w http.ResponseWriter, name string) {
 // request is a request that passed the steps 1 to 4 of section 5.1.
 type request struct {
 	url     string
-	header  jws.RequestHeader
+	header  relayreq.Header
 	payload []byte
 	inst    *installation
 }
@@ -125,7 +125,7 @@ func (o *Operator) post(w http.ResponseWriter, r *http.Request) {
 // error of the first step that fails.
 func (o *Operator) authenticate(path, compact string) (*request, string) {
 	url := o.base() + path
-	header, payload, err := jws.ParseRequest(compact)
+	header, payload, err := relayreq.Parse(compact)
 	if err != nil {
 		return nil, "malformed"
 	}
@@ -145,8 +145,8 @@ func (o *Operator) authenticate(path, compact string) (*request, string) {
 	if req.inst != nil {
 		key = req.inst.key
 	}
-	if _, _, err := jws.VerifyRequest(compact, key); err != nil {
-		if errors.Is(err, jws.ErrSignature) {
+	if _, _, err := relayreq.Verify(compact, key); err != nil {
+		if errors.Is(err, relayreq.ErrSignature) {
 			return nil, "bad-signature"
 		}
 		return nil, "malformed"
@@ -171,7 +171,7 @@ func (o *Operator) checkKid(req *request, compact string) string {
 			return "bad-signature"
 		}
 		if o.cfg.Faults.Has(SignatureBeforeUnpaired) {
-			if _, _, err := jws.VerifyRequest(compact, inst.key); err != nil && errors.Is(err, jws.ErrSignature) {
+			if _, _, err := relayreq.Verify(compact, inst.key); err != nil && errors.Is(err, relayreq.ErrSignature) {
 				return "bad-signature"
 			}
 		}

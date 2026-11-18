@@ -73,12 +73,9 @@ func loadCases[T any](path string) []T {
 	return file.Cases
 }
 
-// liveHello is the hello the tool sends before the frames of a case; liveAck stands for the
-// answer of the relay when the tool asks the rules of the receiver what a live sequence is.
-var (
-	liveHello = must(frames.Hello{MinVersion: 1, MaxVersion: 1, Software: "relay-conformance"}.Encode())
-	liveAck   = must(frames.HelloAck{Version: 1, Software: "relay", Heartbeat: 30, MaxStreams: 1}.Encode())
-)
+// liveAck stands for the answer of the relay when the tool asks the rules of the receiver what
+// a live sequence is; the tool sends the hello of the case itself.
+var liveAck = must(frames.HelloAck{Version: 1, Software: "relay", Heartbeat: 30, MaxStreams: 1}.Encode())
 
 // livePlay is a case of frames-v0.json as the tool plays it: the frames the gateway sends in
 // order, the last of which the relay must refuse.

@@ -3,6 +3,7 @@
 package refdns_test
 
 import (
+	"context"
 	"encoding/binary"
 	"io"
 	"net"
@@ -30,8 +31,8 @@ func query(t *testing.T, name string, typ dnsmessage.Type) []byte {
 
 // server returns the real address of name server k of the zone.
 func server(d *refdns.DNS, k int) string {
-	hosts, _ := d.LookupNS(nil, d.Names()[0])
-	addrs, _ := d.LookupAddr(nil, hosts[k])
+	hosts, _ := d.LookupNS(context.Background(), d.Names()[0])
+	addrs, _ := d.LookupAddr(context.Background(), hosts[k])
 	return d.Remap(addrs[0].String() + ":53")
 }
 

@@ -8,7 +8,7 @@ import (
 	"unicode/utf8"
 )
 
-const hostile = "line\n::error::boom‮evil\x00\x1b[31m \U0001F600 \xff"
+const hostile = "line\n::error::boom\u202eevil\x00\x1b[31m \U0001F600 \xff"
 
 func TestEscQuotesEverythingNotPrintableASCII(t *testing.T) {
 	got := esc(hostile)

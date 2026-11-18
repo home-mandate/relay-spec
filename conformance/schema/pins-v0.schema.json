@@ -64,6 +64,12 @@
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
           },
+          "stored_minutes_ago": {
+            "description": "How long before the start of the case the stored set was stored over a connection with an active pin, in minutes; absent: an hour or more.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1440
+          },
           "steps": {
             "type": "array",
             "minItems": 1,
@@ -138,6 +144,19 @@
                 },
                 "arrived_on": {
                   "const": "other"
+                },
+                "after_minutes": {
+                  "description": "Minutes since the step before, or for the first step since the start of the case; absent: an hour or more, and for the first step none.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1440
+                },
+                "kind": {
+                  "description": "Only with arrived_on other: the kind of the pin of the connection the set was stored through.",
+                  "enum": [
+                    "active",
+                    "backup"
+                  ]
                 }
               }
             }

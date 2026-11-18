@@ -85,6 +85,13 @@ var pinFaults = []struct {
 	{"PinOtherNoClose", refgateway.PinOtherNoClose},
 	{"PinCloseOldSet", refgateway.PinCloseOldSet},
 	{"PinOtherAlwaysClose", refgateway.PinOtherAlwaysClose},
+	{"PinNoLimit", refgateway.PinNoLimit},
+	{"PinLimitBackup", refgateway.PinLimitBackup},
+	{"PinLimitExclusive", refgateway.PinLimitExclusive},
+	{"PinLimitEqual", refgateway.PinLimitEqual},
+	{"PinLimitIgnoredCounts", refgateway.PinLimitIgnoredCounts},
+	{"PinLimitPerConnection", refgateway.PinLimitPerConnection},
+	{"PinLimitRemoval", refgateway.PinLimitRemoval},
 }
 
 var proxyFaults = []struct {
@@ -301,4 +308,8 @@ var ctFaults = []struct {
 	{"CTAckByName", refgateway.CTAckByName},
 	{"CTAckByKey", refgateway.CTAckByKey},
 	{"CTAckFirstOnly", refgateway.CTAckFirstOnly},
+	{"CTAckKeysIgnored", refgateway.CTAckKeysIgnored},
+	{"CTAckKeysAny", refgateway.CTAckKeysAny},
+	{"CTPresentedIgnored", refgateway.CTPresentedIgnored},
+	{"CTPresentedAny", refgateway.CTPresentedAny},
 }
