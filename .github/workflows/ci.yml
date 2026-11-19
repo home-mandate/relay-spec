@@ -6,7 +6,8 @@ name: CI
 # the whole history); a pull request against main additionally runs integration.yml (short
 # fuzzing). Everything is checked before the merge: main takes squash-merged pull requests
 # only, up to date with main and with every required check green, so nothing runs after the
-# merge. scheduled.yml scans for vulnerabilities every night and fuzzes twice a month.
+# merge. scheduled.yml scans for vulnerabilities every night and fuzzes twice a week for the
+# corpus; a release candidate is fuzzed long (release.yml).
 on:
   push:
     branches-ignore: [main, "release/[0-9]+.[0-9]+"]

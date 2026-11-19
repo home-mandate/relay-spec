@@ -10,7 +10,7 @@ GITLEAKS    := github.com/zricethezav/gitleaks/v8@v8.28.0
 
 COVER_MIN      := 95
 FUZZTIME       ?= 10m
-# package:target; the long fuzzing of scheduled.yml builds its matrix from this list (make fuzz-targets)
+# package:target; scheduled.yml and the release gate of release.yml fuzz this list (make fuzz-targets)
 FUZZ_TARGETS   := internal/dnsq:FuzzCAA internal/tunnelclient:FuzzPROXY internal/frames:FuzzReadFrame \
 	internal/frames:FuzzBind internal/tunnelcert:FuzzHomeIDOf internal/tunnelcert:FuzzCheckCSR \
 	internal/request:FuzzVerifyRequest
@@ -73,6 +73,6 @@ fuzz-one:
 	if [ -z "$$spec" ] || [ "$$pkg" = "$$spec" ]; then echo "FUZZ=package:target is needed"; exit 2; fi; \
 	go test ./$$pkg/ -run '^$$' -fuzz "^$$target\$$" -fuzztime $(FUZZTIME)
 
-## fuzz-targets: the targets, one package:target per line; the matrix of the long fuzzing is built from it
+## fuzz-targets: the targets, one package:target per line; the workflows build their lists from it
 fuzz-targets:
 	@printf '%s\n' $(FUZZ_TARGETS)
