@@ -26,11 +26,13 @@ household can still trust a relay it does not control.
 - Every change to a rule comes with new or changed conformance cases. A bug report is most
   useful as a failing case.
 - After changing a schema, an example or a conformance file run `make manifest`.
-- `make check` and `make lint` must pass. Before a release `make fuzz` must pass too.
+- `make check` and `make lint` must pass.
 - When what runs in CI: a push to a branch runs `make check` and `make lint`; a pull request
-  against main or a release branch additionally runs short fuzzing; nothing runs after the
-  merge. Independent of changes, govulncheck runs every night and every fuzz target runs for 45
-  minutes on the 1st and 15th of every month; a failure opens an issue.
+  against main or a release branch additionally runs short fuzzing, which replays the inputs
+  earlier runs found and gives every target 15 seconds; nothing runs after the merge.
+  Independent of changes, govulncheck runs every night, and every fuzz target runs for ten
+  minutes on Wednesday and Saturday and keeps what it finds; a failure opens an issue. A
+  release candidate is fuzzed for 20 minutes per target before it can become the version.
 - Until the freeze (RELAY-v0 Section 11), a minor version may change anything; the Changelog
   says what changed and what implementations have to do.
 - Security problems: see `SECURITY.md`, not a public issue.
