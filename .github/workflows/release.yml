@@ -61,7 +61,7 @@ jobs:
           persist-credentials: false
 
       - id: verify
-        uses: home-mandate/.github/actions/release-verify@07371042bd756742c4cf50238ae3273790e93028
+        uses: home-mandate/.github/actions/release-verify@f73af670bc516d6556a0203315b90c0c6554852f
         with:
           tag: ${{ inputs.tag || github.ref_name }}
           required-checks: |
@@ -82,6 +82,7 @@ jobs:
       - name: The required core specification is a published release
         env:
           GH_TOKEN: ${{ github.token }}
+          KIND: ${{ steps.verify.outputs.kind }}
         run: |
           set -euo pipefail
           if grep -qE '^[[:space:]]*replace([[:space:](]|$)' go.mod; then
@@ -94,6 +95,11 @@ jobs:
           draft=$(gh release view "$core" --repo home-mandate/spec --json isDraft -q .isDraft) ||
             { echo "::error::home-mandate/spec has no release $core"; exit 1; }
           [ "$draft" = false ] || { echo "::error::the release $core of home-mandate/spec is a draft"; exit 1; }
+          # What becomes a version names versions: the last release candidate is tagged after
+          # go.mod moved to the core's version (RELEASING.md, "Releases that depend on each other").
+          if [ "$KIND" = version ] && [[ "$core" == *-* ]]; then
+            echo "::error::a version must require a version of home-mandate/spec, not $core"; exit 1
+          fi
           echo "requires home-mandate/spec $core"
 
   release:
