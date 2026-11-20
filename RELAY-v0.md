@@ -148,7 +148,7 @@ specification is released, the schema can still change under the same `type`.
 | `enrollment` | HTTPS URL of the enrollment directory (Section 5.1); its host MUST be the operator domain or a subdomain of it |
 | `relay` | `host` and `port` where gateways open their tunnel connections |
 | `relay_addresses` | the IPv4 and/or IPv6 addresses (IPv6 in the form of RFC 5952 without the mixed notation; IPv4-mapped addresses are not allowed) where agents reach the relay on port 443; they MUST be globally reachable unicast addresses, none from a private, loopback, link-local, shared (100.64.0.0/10), documentation or other special-purpose range; standard and own-domain names point there (Sections 6.3, 6.4) |
-| `relay_addresses_planned` | optional: `addresses` that replace `relay_addresses` `from` a time at least 30 days after it first appears (Section 6.4) |
+| `relay_addresses_planned` | optional: `addresses` that replace `relay_addresses` `from` a time at least 30 days after it first appears; before that time the operator may withdraw it or move `from` later, never earlier (Section 6.4) |
 | `relay_pins` | SHA-256 digests (canonical base64url, 43 characters) of the SubjectPublicKeyInfo of the keys the relay uses; the gateway pins them at pairing as active pins (Section 6.8) |
 | `relay_backup_pins` | the same for the operator's offline backup keys, pinned as backup pins; no pin may appear in both lists (Section 6.8) |
 | `acme_cas` | issuer domain names (`caa_identity`) of the CAs the operator allows in the CAA records of its standard names; only CAs that log every certificate and enforce RFC 8657 (Section 6.6) |
@@ -724,7 +724,9 @@ operator MUST
 - refuse to create such a code within 72 hours after a notification channel of the household was
   added, changed or removed, notify the previous channels of every such change, and cancel a
   pending such code on every such change, and tell the household that it did;
-- notify the household on all its channels when the code is created;
+- notify the household on all its channels when the code is created, and again when it is used,
+  with the time, so that a household whose gateway did not use it learns that its standard name
+  has moved to another gateway;
 - make the code usable only after a waiting time of at least 24 hours, during which the
   household can cancel it in the portal and through the notification; after the waiting time
   the code stays valid for at most 24 hours, so that the household can plan when to be at the
@@ -947,7 +949,8 @@ through this operator has ended. A gateway that receives `offline-too-long`, or 
 passed (Section 5.5), MUST close the tunnel and delete its installation key and tunnel key, but
 MUST NOT send the unpairing request: the household decides in the portal whether to unpair the
 installation or to pair the gateway again with a code for the existing installation, which keeps
-the standard name (Section 5.2). Either way, the gateway is then no longer paired.
+the standard name (Section 5.2). Either way, the gateway is then no longer paired, and SHOULD go
+on monitoring Certificate Transparency for its former standard name as in Section 6.7.
 
 **Blocking** is an operator measure against abuse. A blocked installation can read its
 installation and unpair; every other request is answered with `blocked`, its tunnel certificates
@@ -973,8 +976,10 @@ household allows; it can only stop being the way in.
 
 ## 6. Names and certificates
 
-Some rules for gateways sit outside this section: pages under a public name in Section 7.1, and the
-backoff after a CA's limits in Section 7.8.
+Some rules for gateways sit outside this section, because they belong to an operator obligation:
+pages under a public name in Section 7.1 (`__Host-` cookies only, and checks of `Origin` or a token
+for every request from a browser that changes anything, with what counts as such a request), and
+the backoff after a CA's limits in Section 7.8. They bind every gateway that uses a relay.
 
 ### 6.1 Public names
 
@@ -1099,7 +1104,11 @@ at most one own-domain name; registering another replaces it. The operator MUST 
 another installation holds (`name-unavailable`); several installations may have the same name
 `pending`, and the first whose token is found holds it, while the others become `lapsed`. It
 MUST refuse the name domain, the operator domain, the trust domain, the host of the relay and
-names below them (`malformed`); the gateway checks this before it sends the name. Unpairing
+names below them (`malformed`); the gateway checks this before it sends the name. During a move to
+another name domain (Section 7.9), from its announcement for as long as the operator controls the old
+name domain, both name domains count as the name domain for this rule, for every installation; the gateway
+checks the name domain fixed at its pairing and the `name_domain` of the metadata it fetched last.
+Unpairing
 releases the own-domain name; a blocked installation keeps holding it, without routing. The
 operator MUST notify the household when the own-domain name is registered, changed or removed. A
 gateway tells the household when its name is `pending` for more than a day or `lapsed`. Names are
@@ -1122,7 +1131,19 @@ administrator, checks again at least once a day, and gives the advice as soon as
 Its announcement and its advice name the last day on which the relay is sure to accept the old
 addresses, 30 days after the `from` that it stored. A gateway that saw no announcement and stored
 no `from` advises the change as soon as this check passes and says that the old addresses can stop working at any time.
-It SHOULD check the A and AAAA records of its own-domain name, telling the household about any
+
+Before the `from` of a planned set, the operator MAY withdraw the set, or move its `from` to a later
+time; it MUST NOT move `from` to an earlier time. A set with other addresses is a new planned set, which
+needs its own 30 days from its first appearance. With a withdrawal, the relay's duty to accept agent
+connections at the planned addresses ends; no household has been advised to use them yet, because the
+standard names still show the addresses in force. A gateway that finds the planned set withdrawn tells
+the household that the announced change will not take place and that its records stay as they are,
+and discards the `from` it stored. A gateway that finds a later `from` stores it and tells the household
+the new date and the new last day for the old addresses. A gateway that finds an earlier `from` for the
+same addresses keeps the `from` it stored and tells its administrator that the operator does not
+conform.
+
+The gateway SHOULD check the A and AAAA records of its own-domain name, telling the household about any
 difference.
 
 **Help for the household.** The portal SHOULD show the records with their values and check them
@@ -1182,6 +1203,16 @@ The cases are in `conformance/ct-v0.json` of the Home-Mandate Specification. The
 its administrator that monitoring is not possible when, for 24 hours, no query of the CAA records
 below has succeeded, or no read of its installation; each of these counts on its own, as does the
 monitoring of Certificate Transparency itself.
+
+**After the pairing ends.** Agents may still try the standard name after the pairing ended
+(Section 5.7), although it no longer reaches the gateway. A gateway SHOULD therefore go on
+monitoring Certificate Transparency for its former standard name, as above, for 90 days after the
+pairing ended, and raise the alarm for every certificate for that name that it did not obtain itself;
+its own certificates it knows by the public keys it used while it was paired. It needs neither the
+operator nor its keys for this. The checks of CAA records below, and of its installation, end with
+the pairing. After these 90 days, only the operator watches the name, as a second net
+(Section 7.4): its home ID stays reserved and the CAA records at the apex permit no issuance
+(Sections 5.7, 6.3).
 
 At least once an hour, the gateway queries, through the resolvers of Section 6.5, the CAA
 records of its standard name and of the apex of the name domain that this name is in, and raises an alarm when the set
@@ -1277,6 +1308,21 @@ Because a gateway cannot rely on such an entry, it follows SPEC-v0 Section 11.7 
 under a public name (`__Host-` cookies only, and changes protected by a check of `Origin` or a token,
 not by `SameSite` alone), whether or not the name domain is on the list.
 
+A **request from a browser that changes anything**, in the sense of that item, is every request
+under the public name that changes state in the gateway and that the gateway accepts on the strength
+of a cookie, or that starts a session (a sign-in, so that another site cannot sign a human in to a
+session of its choosing). Among them are the request that submits a sign-in, the one with which a
+human grants or denies an authorization request on the consent page, an answer to an approval
+request (SPEC-v0 Section 11.1 item 13), and every change made in the user interface. The
+authorization request itself (RFC 6749 Section 4.1.1) comes from another site by design and is not
+one, as long as it shows the consent page or grants no more than a human already granted on that
+page to the same client, and sends the code only to a redirect URI registered for that client. Apart
+from it, a gateway changes no state on a request with a safe method (RFC 9110 Section 9.2.1), so
+that every request of this kind uses another method and can be checked. A request that the gateway
+accepts without a cookie, such as one to the token endpoint or to the endpoint of the agents'
+protocol, gains nothing from coming through a browser and is protected by its credentials, as that
+item says.
+
 The operator SHOULD sign the name domain with DNSSEC, and SHOULD publish both IPv4 and IPv6
 addresses in `relay_addresses`, because agents and their networks may support only one of them.
 
@@ -1303,7 +1349,10 @@ An operator SHOULD monitor Certificate Transparency for its whole name domain, a
 does not replace the monitoring in the gateway (Section 6.7). Only the gateway can tell its own
 certificates. The operator can tell a wildcard certificate, a certificate from a CA that was not in
 `acme_cas` when it was issued and is not the CA of the account in force, and a certificate for a standard name whose home ID was not assigned, or was
-unpaired, when the certificate was issued; it looks into these and tells the households concerned.
+unpaired, when the certificate was issued, going by the times it keeps for the home ID (Section 7.5);
+it looks into these and tells the households concerned. A standard name stays in this monitoring
+after its pairing ended, for as long as the home ID is reserved; the gateway watches it only for a
+limited time (Section 6.7).
 
 ### 7.5 Data of households
 
@@ -1330,7 +1379,8 @@ change.
 Whatever its periods, an operator keeps what this specification requires, for as long as it
 requires it: what Sections 5.2, 5.4 and 5.5 need while the installation exists, including the time
 of each issuance, which it also shows (Section 5.5); the denylist entries until they end
-(Section 7.6); and, without a link to a person, the reserved home ID and what Section 5.7 needs to
+(Section 7.6); and, without a link to a person, the reserved home ID, the times at which it was
+assigned and unpaired, which its monitoring needs (Section 7.4), and what Section 5.7 needs to
 answer `unpaired`. The source address of an issuance is connection data.
 
 An operator MUST use all of this only to run and secure the service, to act against abuse, to bill and as a
@@ -1551,7 +1601,7 @@ this specification; what an operator itself could do is in the rows below and in
 | **Forges the address of an agent** | The gateway takes the PROXY header only on data connections it opened and bound itself, in one strict form, refuses local and private sources, and never uses the address for trust (Section 4.6) | A compromised relay can forge addresses; they affect limits and logs, not authorization |
 | **Guesses a pairing code** | 80 random bits, valid for at most 10 minutes (24 hours for a code for an existing installation, after its waiting time), single use, limited attempts, one answer for all failures (Section 5.2) | – |
 | **Intercepts or is shown a pairing code** for a new installation before the household uses it | The code is bound to the household's account, not to a gateway; the operator notifies the household of every new installation (Section 5.2) | The attacker's gateway is paired to the household's account until the household notices and unpairs it. It gets a new standard name and does not receive the household's agents |
-| **Intercepts or is shown a pairing code for an existing installation** | Created only after a fresh authentication and not within 72 hours after a change of notification channels, announced on all channels, usable only after at least 24 hours in which the household can cancel it; a gateway that still runs warns its administrator during that time (Section 5.2) | A household that ignores the announcement loses its standard name to the attacker's gateway, which then receives the household's agents and can complete their TLS for the standard name; an own-domain name stays bound to the old ACME account by the household's CAA record until the household changes it. The replaced gateway learns it (`unpaired`) and tells the household; the new server certificate appears in Certificate Transparency (Section 6.7) |
+| **Intercepts or is shown a pairing code for an existing installation** | Created only after a fresh authentication and not within 72 hours after a change of notification channels, announced on all channels when it is created and when it is used, usable only after at least 24 hours in which the household can cancel it; a gateway that still runs warns its administrator during that time (Section 5.2) | A household that ignores the announcement loses its standard name to the attacker's gateway, which then receives the household's agents and can complete their TLS for the standard name; an own-domain name stays bound to the old ACME account by the household's CAA record until the household changes it. The replaced gateway learns it (`unpaired`) and tells the household; the new server certificate appears in Certificate Transparency, where the replaced gateway goes on watching the name for 90 days (Section 6.7) |
 | **Lures a household to a malicious operator** (a pairing string of the attacker) | Pairing only by the local administrator, after the gateway showed the operator domain and its parameters (Section 5.2) | A household that confirms anyway uses that operator, with the protection Section 6.2 gives against operators |
 | **Replays a request** | Single-use nonces and the signed `url` (Section 5.1) | – |
 | **Another installation's key** (any paired gateway, also one paired to the attacker's own account) | The URL of a request must belong to the installation of its key (Section 5.1); installation URLs carry 128 random bits | – |
@@ -1566,7 +1616,7 @@ this specification; what an operator itself could do is in the rows below and in
 | **Forges DNS answers to the gateway** | DNSSEC, or two independent resolvers (Section 6.5); the CA validates independently | A wrong protection level shown in the gateway, a missed CAA alarm, or advice on relay addresses that is suppressed or delayed; issuance is not affected |
 | **Loses or leaks the relay key** (operator; a backup key as in Section 7.7) | Backup pins of offline keys; new pins only over a pinned tunnel; over an active key the backup pins cannot change, and only a backup key can replace the whole set (Section 6.8) | With a leaked active key and a position on the path: denial of service and tunnel metadata until the operator connects with a backup key. With a leaked backup key and a position on the path, the attacker can replace every pin, the operator's other backup pins included, and the operator loses the gateways it reaches until their administrators take new pins (still no content). With every pinned key lost, the local administrator must take new pins after a warning |
 | **Another gateway in the same name domain** (a home of the same operator, in the household's browser) | The name domain is apart from the operator's other sites; gateways use only `__Host-` cookies, ignore others, and protect changes with `Origin` or a token (Section 7.1) | Without an entry on the Public Suffix List, a page of another home counts as the same site and can set cookies for the name domain; too many of them can make a browser's requests fail |
-| **Compromises the portal** | CA key and DNS credentials SHOULD be kept apart from it (Section 7.7); households are told (Section 7.9) | With them apart, the attacker can confirm foreign accounts and create codes, also without waiting times or notifications if those run in the portal, and then complete agents' TLS for standard names until the Certificate Transparency alarm of a gateway that is still paired. A code for an existing installation, redeemed by the attacker's gateway, unpairs the household's gateway, which then stops monitoring: the household sees only that remote access has ended. It also gets the households' data. Without them apart, it can also change CAA records and issue tunnel certificates directly. An own-domain name stays protected by the household's CAA record |
+| **Compromises the portal** | CA key and DNS credentials SHOULD be kept apart from it (Section 7.7); households are told (Section 7.9) | With them apart, the attacker can confirm foreign accounts and create codes, also without waiting times or notifications if those run in the portal, and then complete agents' TLS for standard names until the Certificate Transparency alarm of a gateway that is still paired. A code for an existing installation, redeemed by the attacker's gateway, unpairs the household's gateway; that gateway sees only that remote access has ended, unless it goes on monitoring its former standard name (Section 6.7) and raises an alarm for the attacker's certificate. It also gets the households' data. Without them apart, it can also change CAA records and issue tunnel certificates directly. An own-domain name stays protected by the household's CAA record |
 | **Takes over a name domain that was given up** | The operator keeps control of it for a year, without records that permit issuance (Section 7.9) | After that year, or if the operator fails, agents that still use a name of that domain can reach whoever holds it, if that party obtains a certificate |
 | **Exhausts the CA's limit** with many pairings or through its own ACME accounts | Limits on new pairings per account and in total (Section 7.8); renewals coordinated by ACME Renewal Information are usually exempt | New pairings wait, and so does a gateway that needs a new certificate after a replacement or a lost key; a party with many accounts can still use up the limit |
 | **Operator that tries to change what the household allows** | No message of Sections 4 and 5 carries mandates, approver keys or issuer keys; optional frames carry nothing that security depends on; a gateway accepts none (Sections 4.3, 5.7) | – |
@@ -1686,11 +1736,48 @@ the household as the sections say:
 - a CA removed from `acme_cas`, or a CA that no longer meets the conditions (Section 6.6);
 - a gateway that cannot obtain a server certificate (Section 5.6);
 - a CAA record of an own-domain name that has to change after a new ACME account (Section 6.5);
+- an announced change of the relay addresses, its withdrawal, a new `from`, and the advice to
+  change the records of an own-domain name (Section 6.4);
+- an alarm for a certificate for the former standard name after the pairing ended (Section 6.7):
+  `cert.unexpected` of SPEC-v0 records certificates for the host of the public origin, which that
+  name no longer is;
 - the loss of a tunnel connection, and the error responses not named in the table.
 
 ## Changelog
 
 ### Unreleased
+
+- Normative change, Sections 3 and 6.4: before its `from`, an operator MAY withdraw a planned set
+  of relay addresses or move its `from` later, never earlier; a set with other addresses is a new
+  set with its own 30 days, and a withdrawal ends the duty to accept agent connections at the
+  planned addresses. A gateway tells the household of a withdrawal or a new date, discards or
+  replaces the `from` it stored, and keeps it when the new `from` is earlier, telling its
+  administrator. Section 12: none of this triggers an event.
+- Normative change, Section 5.2: an operator notifies the household on all its channels also when
+  a pairing code for an existing installation is used, with the time.
+- Normative change, Sections 5.7, 6.7 and 7.4: after its pairing ended, a gateway SHOULD go on
+  monitoring Certificate Transparency for its former standard name for 90 days and raise the alarm
+  for every certificate it did not obtain; the CAA checks and the reads of the installation end
+  with the pairing. After that, only the operator's monitoring of the name domain covers the name,
+  for as long as the home ID is reserved. Section 12: the alarm triggers no event of audit/v1.
+  Section 9 says what this gives against a replacement by an attacker.
+- Normative change, Section 6.4: during a move of the name domain (Section 7.9), the operator
+  refuses own-domain names at or below the old and the new name domain for every installation, and
+  a gateway checks both before it sends a name.
+- Sections 7.4 and 7.5: an operator keeps, without a link to a person, the times at which a reserved
+  home ID was assigned and unpaired, which its monitoring needs.
+- Section 7.1: a request from a browser that changes anything (SPEC-v0 Section 11.7 item 5) is one
+  that changes state and is accepted on the strength of a cookie, or that starts a session: the
+  submission of a sign-in, a consent, an answer to an approval request and every change in the
+  user interface. The authorization request is not one while it grants no more than a human
+  already granted to the same client; otherwise a gateway changes no state on a request with a
+  safe method. Requests without a cookie, such as those to the token endpoint, are protected by
+  their credentials.
+- Section 6 names the gateway rules of Section 7.1 (`__Host-` cookies, checks of `Origin` or a
+  token) and of Section 7.8 (backoff after a CA's limits), which bind every gateway that uses a
+  relay.
+- README: the table of contents names `schema/` and `examples/` (Apache 2.0) and
+  `conformance/enrollment-v0.json`, in place of a row with an empty path.
 
 - Section 11: until the core has an audit version 2, a change to this document keeps within the
   events, members and values of audit/v1. Section 12 says that every entry without the
