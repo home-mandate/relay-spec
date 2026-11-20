@@ -24,8 +24,10 @@ Home-Mandate for Home Assistant the first gateway.
 | Path | Contents | License |
 |---|---|---|
 | `RELAY-v0.md` | The specification | CC BY 4.0 |
-| `` | Schemas, examples and tests of the Relay Specification (draft, not part of `v0.1.0`) | Apache 2.0 |
 | `cas.md` | Informative list of certificate authorities that log every certificate and enforce RFC 8657 | CC BY 4.0 |
+| `schema/` | JSON Schemas of the operator metadata (section 3) and of the enrollment messages (section 5) | Apache 2.0 |
+| `examples/` | Examples of the metadata and of the enrollment messages, each valid against its schema | Apache 2.0 |
+| `conformance/enrollment-v0.json` | The order of the checks of an enrollment request (section 5.1), with the error the operator answers | Apache 2.0 |
 | `conformance/jws-v0.json` | Requests of the Relay Specification (the JWS of sections 5.1 and 5.5) with the expected result: valid, malformed or bad-signature | Apache 2.0 |
 | `conformance/metadata-v0.json` | Operator metadata (section 3) that a gateway accepts or rejects | Apache 2.0 |
 | `conformance/csr-v0.json` | Certificate signing requests for tunnel certificates (section 5.4) that an operator accepts or refuses with `bad-csr` | Apache 2.0 |
