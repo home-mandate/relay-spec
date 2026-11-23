@@ -13,7 +13,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/hex"
@@ -26,6 +25,7 @@ import (
 
 	"github.com/home-mandate/relay-spec/internal/ctlog"
 	"github.com/home-mandate/relay-spec/internal/dnsq"
+	"github.com/home-mandate/relay-spec/internal/reflog"
 )
 
 // Identity is the issuer domain name of the reference CA, its caa_identity.
@@ -35,7 +35,7 @@ const Identity = "ca.example.com"
 const Host = "acme." + Identity
 
 // Fault switches on one deliberate defect of the CA. Faults combine as a mask.
-type Fault uint8
+type Fault uint16
 
 // Defects of the CA, each breaking what one check of the class issuance looks at.
 const (
@@ -51,6 +51,13 @@ const (
 	NoSCT
 	// SCTOfOtherCertificate (I6) embeds SCTs that the logs gave for another certificate.
 	SCTOfOtherCertificate
+	// NotIncluded (I7) has its first log leave out the entries it gives SCTs for.
+	NotIncluded
+	// BadTreeHead (I8) has its first log sign its tree heads wrongly.
+	BadTreeHead
+	// ExtraCertificate (I9) issues, for every name it issues for, a second certificate with
+	// another key, which only the search sources show.
+	ExtraCertificate
 )
 
 // Has reports whether f contains the defect.
@@ -74,13 +81,11 @@ type Config struct {
 const (
 	certLifetime = 6 * 24 * time.Hour
 	caLifetime   = 30 * 24 * time.Hour
-	logInterval  = 365 * 24 * time.Hour
 	maxBodyBytes = 64 << 10
 	nonceBytes   = 16
 	idBytes      = 8
 	tokenBytes   = 32
 	dnsTimeout   = 5 * time.Second
-	logOperators = 2
 )
 
 // CA is a reference CA.
@@ -88,7 +93,7 @@ type CA struct {
 	cfg    Config
 	key    *ecdsa.PrivateKey
 	cert   *x509.Certificate
-	logs   []*ecdsa.PrivateKey
+	logs   []*reflog.Log
 	list   *ctlog.List
 	serial *big.Int
 
@@ -99,6 +104,8 @@ type CA struct {
 	authzs   map[string]*authz
 	certs    map[string][][]byte
 	issued   []*x509.Certificate
+	// listed are the certificates the search sources show.
+	listed []listed
 }
 
 type account struct {
@@ -140,30 +147,13 @@ func New(cfg Config) *CA {
 	c := &CA{cfg: cfg, key: key, cert: cert, serial: big.NewInt(1),
 		nonces: map[string]bool{}, accounts: map[string]*account{}, orders: map[string]*order{},
 		authzs: map[string]*authz{}, certs: map[string][][]byte{}}
-	for range logOperators {
-		c.logs = append(c.logs, must(ecdsa.GenerateKey(elliptic.P256(), rand.Reader)))
-	}
-	c.list = buildList(c.logs)
+	// Log A follows RFC 6962, log B is tiled; both include at once (a maximum merge delay of 0).
+	a := reflog.New(c.url("/logs/a/"), false)
+	a.SetInclude(!cfg.Faults.Has(NotIncluded))
+	a.SetBadTreeHead(cfg.Faults.Has(BadTreeHead))
+	c.logs = []*reflog.Log{a, reflog.New(c.url("/logs/b/"), true)}
+	c.list = must(reflog.List(c.logs...))
 	return c
-}
-
-// buildList is the log list with the stub logs, one operator each.
-func buildList(keys []*ecdsa.PrivateKey) *ctlog.List {
-	now := time.Now().UTC()
-	var ops []map[string]any
-	for i, k := range keys {
-		der := must(x509.MarshalPKIXPublicKey(&k.PublicKey))
-		id := sha256.Sum256(der)
-		letter := string(rune('A' + i))
-		ops = append(ops, map[string]any{"name": "Reference log operator " + letter, "logs": []map[string]any{{
-			"description": "Reference log " + letter, "log_id": id[:], "key": der, "mmd": 60,
-			"url":               "https://log" + strings.ToLower(letter) + "." + Identity + "/",
-			"state":             map[string]any{"usable": map[string]any{"timestamp": now.Add(-time.Hour)}},
-			"temporal_interval": map[string]any{"start_inclusive": now.Add(-logInterval), "end_exclusive": now.Add(logInterval)},
-		}}})
-	}
-	data := must(json.Marshal(map[string]any{"version": "1", "log_list_timestamp": now, "operators": ops}))
-	return must(ctlog.ParseList(data))
 }
 
 // Directory returns the URL of the ACME directory.
@@ -212,8 +202,18 @@ func (c *CA) Handler() http.Handler {
 	mux.HandleFunc("HEAD /new-nonce", c.newNonce)
 	mux.HandleFunc("GET /new-nonce", c.newNonce)
 	mux.HandleFunc("POST /", c.post)
+	mux.Handle("GET /logs/a/", c.logs[0].Handler())
+	mux.Handle("GET /logs/b/", c.logs[1].Handler())
+	mux.HandleFunc("GET /certspotter/v1/issuances", c.certSpotter)
+	mux.HandleFunc("GET /crtsh/", c.crtSh)
 	return mux
 }
+
+// CertSpotter returns the base URL of the search source in the form of the Cert Spotter API.
+func (c *CA) CertSpotter() string { return c.url("/certspotter") }
+
+// CrtSh returns the URL of the search source in the form of crt.sh.
+func (c *CA) CrtSh() string { return c.url("/crtsh/") }
 
 func (c *CA) url(path string) string { return "https://" + Host + path }
 

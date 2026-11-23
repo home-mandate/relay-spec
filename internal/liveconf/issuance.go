@@ -47,7 +47,7 @@ var DefaultCAs = []CA{{
 const (
 	reasonNoCA     = "acme_cas lists no CA whose ACME endpoints the tool knows, so the class issuance was not run"
 	reasonStaging  = "Certificate Transparency is checked only against the production environment of the CA (-acme-production)"
-	reasonCTVerify = "the inclusion of the certificate in the logs and the snapshot of Certificate Transparency need -ct-verify, which this version of the tool does not have yet"
+	reasonCTVerify = "the inclusion of the certificate in the logs and the snapshot of Certificate Transparency are checked by -ct-verify with the file of this run"
 	problemPrefix  = "urn:ietf:params:acme:error:"
 	maxProblemName = 40
 )
@@ -361,7 +361,6 @@ func (is *issuing) checkSCTs(ctx context.Context, o outcome) {
 		r.incomplete(reasonStaging)
 		return
 	}
-	r.incomplete(reasonCTVerify)
 	if len(o.chain) == 0 {
 		return
 	}
@@ -374,6 +373,10 @@ func (is *issuing) checkSCTs(ctx context.Context, o outcome) {
 	if err1 != nil || err2 != nil || leaf.CheckSignatureFrom(issuer) != nil {
 		r.incomplete("the CA sent no certificate of its issuer after the certificate, so the SCTs could not be checked")
 		return
+	}
+	if is.s.seen[CheckIssuanceIssue] && !is.s.r.failedCheck(CheckIssuanceIssue) {
+		r.incomplete(reasonCTVerify)
+		r.ct = &ctCertificate{leaf: leaf, issuer: issuer, name: is.name}
 	}
 	list, err := r.logList(ctx)
 	if err != nil {

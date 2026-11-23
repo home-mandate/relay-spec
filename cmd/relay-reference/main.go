@@ -108,6 +108,7 @@ func runAgainstReference(ctx context.Context, self, statePath string) liveconf.R
 		Unpair:  liveconf.UnpairInstallation,
 		CAs:     []liveconf.CA{{Identity: refca.Identity, Production: caEndpoint(r), Staging: caEndpoint(r)}},
 		LogList: func(context.Context) (*ctlog.List, error) { return r.Operator.CA().LogList(), nil },
+		Sources: liveconf.CTSources{CertSpotter: r.Operator.CA().CertSpotter(), CrtSh: r.Operator.CA().CrtSh()},
 	}
 	s := liveconf.Settings{
 		Operator:  refop.DefaultOperator,
@@ -119,7 +120,12 @@ func runAgainstReference(ctx context.Context, self, statePath string) liveconf.R
 		// The reference CA plays the production environment of a CA, with its own logs.
 		ACMEProduction: true,
 	}
-	return liveconf.RunWith(ctx, s, env)
+	res := liveconf.RunWith(ctx, s, env)
+	if res.CTFile == "" {
+		return res
+	}
+	// The logs of the reference CA include at once, so the run is completed right away.
+	return liveconf.CTVerifyWith(ctx, liveconf.Settings{CTVerifyPath: res.CTFile, Version: version}, env)
 }
 
 // caEndpoint is the ACME endpoint of the reference CA of the operator.

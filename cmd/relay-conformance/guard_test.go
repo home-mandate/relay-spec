@@ -18,7 +18,7 @@ const modulePath = "github.com/home-mandate/relay-spec/"
 // referencePackages are the packages that hold test keys, reference operators and faults;
 // nothing the tool or the files of package relay (which are not tests) import may reach them
 // (RELAY-v0 section 8.2: test keys must not be used with a live operator).
-var referencePackages = []string{"refop", "refrelay", "refdns", "refgateway", "refca"}
+var referencePackages = []string{"refop", "refrelay", "refdns", "refgateway", "refca", "reflog"}
 
 // importsOf returns every package that the non-test files of the package in dir import,
 // directly and indirectly, within this module.

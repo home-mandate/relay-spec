@@ -78,11 +78,15 @@ func referenceExecutor(t *testing.T, faults refrelay.Fault) (executor, []string,
 		Unpair:  liveconf.UnpairInstallation,
 		CAs:     []liveconf.CA{{Identity: refca.Identity, Production: caEndpoint(r), Staging: caEndpoint(r)}},
 		LogList: func(context.Context) (*ctlog.List, error) { return r.Operator.CA().LogList(), nil },
+		Sources: liveconf.CTSources{CertSpotter: r.Operator.CA().CertSpotter(), CrtSh: r.Operator.CA().CrtSh()},
 	}
 	ex := executor{
 		run: func(ctx context.Context, s liveconf.Settings) liveconf.Result { return liveconf.RunWith(ctx, s, env) },
 		cleanup: func(ctx context.Context, s liveconf.Settings) liveconf.Result {
 			return liveconf.CleanupWith(ctx, s, env)
+		},
+		ctVerify: func(ctx context.Context, s liveconf.Settings) liveconf.Result {
+			return liveconf.CTVerifyWith(ctx, s, env)
 		},
 	}
 	return ex, []string{
@@ -97,9 +101,10 @@ func caEndpoint(r *refop.Running) liveconf.Endpoint {
 }
 
 // TestTheCommandAgainstTheReference: through run, the clean reference exits 3 with a report that
-// says every class but issuance conforms and that only the checks of -ct-verify are missing (the
-// next version of the tool has them and makes it exit 0), a defect exits 1 with the failed check
-// in the report, and neither the output nor the report holds an installation URL or a pairing code.
+// says every class but issuance conforms and that only the checks of -ct-verify are missing, and
+// -ct-verify with the file of the run then exits 0 with a conformant report; a defect exits 1
+// with the failed check in the report; neither the output nor the report holds an installation
+// URL or a pairing code.
 func TestTheCommandAgainstTheReference(t *testing.T) {
 	for name, tt := range map[string]struct {
 		faults    refrelay.Fault
@@ -157,6 +162,37 @@ func TestTheCommandAgainstTheReference(t *testing.T) {
 			if routes := r.Operator.Routes(); len(routes) != 0 {
 				t.Errorf("%d names are still served", len(routes))
 			}
+			if tt.failedIDs == nil {
+				completeWithCTVerify(t, ex, dir)
+			}
 		})
 	}
+}
+
+// completeWithCTVerify runs -ct-verify with the file of the run in dir: the report of the whole
+// run conforms.
+func completeWithCTVerify(t *testing.T, ex executor, dir string) {
+	t.Helper()
+	reportPath := filepath.Join(dir, "report-ct.json")
+	var out, errOut bytes.Buffer
+	args := []string{"-ct-verify", filepath.Join(dir, "state.ct.json"), "-report", reportPath}
+	if code := run(context.Background(), args, func(string) string { return "" }, &out, &errOut, ex); code != liveconf.ExitConforms {
+		t.Fatalf("-ct-verify: exit %d\n%s\n%s", code, out.String(), errOut.String())
+	}
+	var rep liveconf.Report
+	if err := json.Unmarshal(must(os.ReadFile(reportPath)), &rep); err != nil || !rep.Conforms || rep.CTVerified == "" {
+		t.Errorf("report after -ct-verify: %v, %+v", err, rep)
+	}
+	for _, class := range liveconf.AllClasses {
+		if c := rep.Classes[class]; c == nil || !c.Conforms {
+			t.Errorf("class %s: %+v", class, c)
+		}
+	}
+}
+
+func must[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return v
 }

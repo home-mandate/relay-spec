@@ -22,6 +22,7 @@ const code1 = "ABCD-EFGH-IJKL-MNOP"
 type fake struct {
 	settings liveconf.Settings
 	cleaned  bool
+	verified bool
 	called   bool
 	result   liveconf.Result
 }
@@ -34,6 +35,10 @@ func (f *fake) executor() executor {
 		},
 		cleanup: func(_ context.Context, s liveconf.Settings) liveconf.Result {
 			f.settings, f.called, f.cleaned = s, true, true
+			return f.result
+		},
+		ctVerify: func(_ context.Context, s liveconf.Settings) liveconf.Result {
+			f.settings, f.called, f.verified = s, true, true
 			return f.result
 		},
 	}
@@ -142,6 +147,22 @@ func TestFlagsReachTheSettings(t *testing.T) {
 	}
 	if code, _, _ := call(t, f, nil, "-cleanup", "s.json", "-acme-production"); code != liveconf.ExitUsage {
 		t.Errorf("a clean-up with -acme-production: exit %d", code)
+	}
+}
+
+func TestCTVerifyMode(t *testing.T) {
+	f := &fake{result: sampleResult(liveconf.ExitConforms)}
+	reportPath := filepath.Join(t.TempDir(), "r.json")
+	code, _, _ := call(t, f, nil, "-ct-verify", "run.ct.json", "-report", reportPath, "-timeout", "5m")
+	if code != 0 || !f.verified || f.cleaned || f.settings.CTVerifyPath != "run.ct.json" || f.settings.Timeout != 5*time.Minute {
+		t.Errorf("exit %d, settings %+v", code, f.settings)
+	}
+	if _, err := os.Stat(reportPath); err != nil {
+		t.Errorf("no report: %v", err)
+	}
+	f = &fake{}
+	if code, _, _ := call(t, f, nil, "-ct-verify", "run.ct.json", "-operator", "op.example.net"); code != liveconf.ExitUsage || f.called {
+		t.Errorf("-ct-verify with an operator: exit %d", code)
 	}
 }
 

@@ -22,6 +22,7 @@ const usage = `usage:
                     [-classes metadata,enrollment,dns,relay,issuance] [-acme-production]
                     [-report <file>] [-state <file>] [-timeout <duration>]
   relay-conformance -cleanup <state file> [-dns-hook <command> | -dns-manual]
+  relay-conformance -ct-verify <file of a run> [-report <file>] [-timeout <duration>]
   relay-conformance -list
 
 Pairing codes (at most two) come from -code-file (preferred: one code in the file), -code
@@ -30,7 +31,10 @@ separated by commas or blanks). An operator conforms only with two codes and an 
 and with all five classes. The class issuance creates two accounts at a CA of acme_cas, agrees
 to its terms of service, and orders certificates for a standard name: in the CA's test
 environment, or with -acme-production in its production environment, which issues one real
-certificate and is needed for the checks of Certificate Transparency. -timeout is at most 1h.
+certificate and is needed for the checks of Certificate Transparency. Such a run writes a file
+next to the state file; once the logs had their maximum merge delay (at most a day),
+-ct-verify with that file checks that the logs include the certificate and that no other
+certificate for the name appeared, and writes the report of the whole run. -timeout is at most 1h.
 Exit codes: 0 conformant, 1 not conformant, 2 wrong call, 3 incomplete, 4 clean-up failed.
 `
 
@@ -44,6 +48,8 @@ const codesEnv = "RELAY_CONFORMANCE_CODES"
 type executor struct {
 	run     func(context.Context, liveconf.Settings) liveconf.Result
 	cleanup func(context.Context, liveconf.Settings) liveconf.Result
+	// ctVerify completes a production run; the command's is liveconf.ExecuteCTVerify.
+	ctVerify func(context.Context, liveconf.Settings) liveconf.Result
 }
 
 // list collects the values of a repeatable flag.
@@ -75,6 +81,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 	flags.BoolVar(&s.ACMEProduction, "acme-production", false, "class issuance: use the production environment of the CA")
 	flags.StringVar(&s.StatePath, "state", "", "state file")
 	flags.StringVar(&s.CleanupPath, "cleanup", "", "state file of a run to clean up")
+	flags.StringVar(&s.CTVerifyPath, "ct-verify", "", "file of a production run to complete")
 	flags.StringVar(&classes, "classes", "", "classes to run, separated by commas")
 	flags.DurationVar(&s.Timeout, "timeout", 0, "limit of the run, at most 1h")
 	reportPath := flags.String("report", "", "write the report as JSON to this file")
@@ -100,6 +107,9 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 	}
 	if s.CleanupPath != "" {
 		return report(ex.cleanup(ctx, s), "", stdout, stderr)
+	}
+	if s.CTVerifyPath != "" {
+		return report(ex.ctVerify(ctx, s), *reportPath, stdout, stderr)
 	}
 	return report(ex.run(ctx, s), *reportPath, stdout, stderr)
 }
