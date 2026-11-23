@@ -37,4 +37,4 @@ func main() {
 
 // production is the only executor the command has: it runs with the address filter without
 // exceptions and the real time values.
-var production = executor{run: liveconf.Execute, cleanup: liveconf.ExecuteCleanup}
+var production = executor{run: liveconf.Execute, cleanup: liveconf.ExecuteCleanup, ctVerify: liveconf.ExecuteCTVerify}

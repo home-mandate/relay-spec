@@ -133,11 +133,17 @@ func signedData(s SCT, tbs, issuerSPKI []byte) ([]byte, error) {
 // SignPrecert returns the SCT a log with the key gives for a precertificate with the
 // TBSCertificate tbs (without poison and SCTs) of the issuer with the SubjectPublicKeyInfo.
 func SignPrecert(key crypto.Signer, tbs, issuerSPKI []byte, at time.Time) (SCT, error) {
+	return SignPrecertWithExtensions(key, tbs, issuerSPKI, at, nil)
+}
+
+// SignPrecertWithExtensions is SignPrecert with SCT extensions, such as the leaf index of a
+// tiled log.
+func SignPrecertWithExtensions(key crypto.Signer, tbs, issuerSPKI []byte, at time.Time, ext []byte) (SCT, error) {
 	der, err := x509.MarshalPKIXPublicKey(key.Public())
 	if err != nil {
 		return SCT{}, err
 	}
-	s := SCT{LogID: sha256.Sum256(der), Timestamp: uint64(at.UnixMilli()), HashAlg: hashSHA256} //nolint:gosec // after 1970
+	s := SCT{LogID: sha256.Sum256(der), Timestamp: uint64(at.UnixMilli()), HashAlg: hashSHA256, Extensions: ext} //nolint:gosec // after 1970
 	switch key.Public().(type) {
 	case *ecdsa.PublicKey:
 		s.SigAlg = sigECDSA

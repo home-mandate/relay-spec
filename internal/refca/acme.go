@@ -345,8 +345,13 @@ func (c *CA) issue(csr *x509.CertificateRequest) [][]byte {
 		tmpl.ExtraExtensions = []pkix.Extension{{Id: ctlog.OIDSCTList, Value: c.scts(tmpl, csr)}}
 	}
 	der := must(x509.CreateCertificate(rand.Reader, tmpl, c.cert, csr.PublicKey, c.key))
+	cert := must(x509.ParseCertificate(der))
 	c.mu.Lock()
-	c.issued = append(c.issued, must(x509.ParseCertificate(der)))
+	c.issued = append(c.issued, cert)
+	c.listed = append(c.listed, listedOf(cert, len(c.listed)+1))
+	if c.cfg.Faults.Has(ExtraCertificate) {
+		c.listed = append(c.listed, otherKey(listedOf(cert, len(c.listed)+1)))
+	}
 	c.mu.Unlock()
 	return [][]byte{der, c.cert.Raw}
 }
@@ -366,8 +371,8 @@ func (c *CA) scts(tmpl *x509.Certificate, csr *x509.CertificateRequest) []byte {
 		logs = logs[:1]
 	}
 	var list []ctlog.SCT
-	for _, k := range logs {
-		list = append(list, must(ctlog.SignPrecert(k, pre.RawTBSCertificate, c.cert.RawSubjectPublicKeyInfo, time.Now())))
+	for _, l := range logs {
+		list = append(list, must(l.Submit(pre.RawTBSCertificate, c.cert.RawSubjectPublicKeyInfo, time.Now())))
 	}
 	if f.Has(BadSCT) {
 		last := list[len(list)-1].Signature

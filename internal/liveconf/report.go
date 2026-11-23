@@ -27,8 +27,10 @@ type Report struct {
 	Manifest string `json:"manifest"`
 	Operator string `json:"operator"`
 	// Date is the day of the run, UTC (RELAY-v0 section 8.1).
-	Date    string                  `json:"date"`
-	Classes map[string]*ClassResult `json:"classes"`
+	Date string `json:"date"`
+	// CTVerified is the day of the -ct-verify that completed the run, UTC.
+	CTVerified string                  `json:"ct_verified,omitempty"`
+	Classes    map[string]*ClassResult `json:"classes"`
 	// Failures lists at most 200 failures, each text at most 200 characters.
 	Failures        []Failure     `json:"failures"`
 	FailuresOmitted int           `json:"failures_omitted,omitempty"`

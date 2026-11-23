@@ -37,8 +37,8 @@ func runAll(t *testing.T, cfg refop.Config, faults refrelay.Fault, classes ...st
 }
 
 // waitsOnlyForCTVerify reports whether a run passed every check it made and lacks only the
-// checks of -ct-verify, which this version of the tool does not have yet: then it is
-// incomplete for that reason alone (the next version makes the clean reference conformant).
+// checks of -ct-verify: then it is incomplete for that reason alone, and -ct-verify with its
+// file completes it (TestCTVerifyCompletesTheRun).
 func waitsOnlyForCTVerify(res Result) bool {
 	want := []string{reasonCTVerify, fmt.Sprintf("class %s skipped 2 checks", ClassIssuance)}
 	if res.Exit != ExitIncomplete || len(res.Report.Failures) != 0 || !slices.Equal(res.Report.Incomplete, want) {

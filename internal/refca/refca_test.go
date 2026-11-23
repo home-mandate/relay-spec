@@ -10,11 +10,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -27,7 +29,10 @@ import (
 	"github.com/home-mandate/relay-spec/internal/refca"
 )
 
-const name = "h.homes.example.org"
+const (
+	name  = "h.homes.example.org"
+	name2 = name
+)
 
 // zone is the CA's view of DNS in these tests.
 type zone struct {
@@ -408,3 +413,46 @@ func TestRequestsWithDefectsAreRefused(t *testing.T) {
 }
 
 func b64(s string) string { return base64.RawURLEncoding.EncodeToString([]byte(s)) }
+
+// TestTheSearchSourcesListTheIssuedCertificates: the stub of Cert Spotter finds a certificate by
+// its name and by a covering wildcard, crt.sh by the name in q, and with ExtraCertificate each
+// shows a second certificate with another key.
+func TestTheSearchSourcesListTheIssuedCertificates(t *testing.T) {
+	for name, tt := range map[string]struct {
+		fault refca.Fault
+		want  int
+	}{"clean": {0, 1}, "I9 an extra certificate": {refca.ExtraCertificate, 2}} {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(t, tt.fault)
+			a, acct := w.account(t)
+			w.permit(acct)
+			if _, err := w.order(t, a, name2, true); err != nil {
+				t.Fatal(err)
+			}
+			count := func(u string) int {
+				resp, err := w.client.Get(u)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer resp.Body.Close()
+				var list []map[string]any
+				if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+					t.Fatal(err)
+				}
+				return len(list)
+			}
+			if n := count(w.ca.CertSpotter() + "/v1/issuances?domain=" + name2); n != tt.want {
+				t.Errorf("Cert Spotter: %d", n)
+			}
+			if n := count(w.ca.CertSpotter() + "/v1/issuances?domain=" + name2 + "&after=" + strconv.Itoa(tt.want)); n != 0 {
+				t.Errorf("Cert Spotter after the last: %d", n)
+			}
+			if n := count(w.ca.CrtSh() + "?q=" + name2); n != tt.want {
+				t.Errorf("crt.sh: %d", n)
+			}
+			if n := count(w.ca.CrtSh() + "?q=other.example"); n != 0 {
+				t.Errorf("crt.sh for another name: %d", n)
+			}
+		})
+	}
+}

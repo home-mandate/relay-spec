@@ -55,7 +55,21 @@ type Env struct {
 	CAs []CA
 	// LogList returns the log list for the SCTs; nil means the signed list of Google.
 	LogList func(ctx context.Context) (*ctlog.List, error)
+	// Sources are the search sources of the snapshot of Certificate Transparency; without them
+	// the snapshot is not taken.
+	Sources CTSources
 }
+
+// CTSources are the base URLs of the two search sources of ct-sources.md of the core.
+type CTSources struct {
+	// CertSpotter is the base of the Cert Spotter API, without /v1.
+	CertSpotter string
+	// CrtSh is the URL of crt.sh, ending in "/".
+	CrtSh string
+}
+
+// DefaultSources are the sources the command uses.
+var DefaultSources = CTSources{CertSpotter: "https://api.certspotter.com", CrtSh: "https://crt.sh/"}
 
 // Unpairer unpairs a test installation with the keys of the run; enrollment is the URL of the
 // enrollment directory the installation URL has to be on.
@@ -64,7 +78,7 @@ type Unpairer func(ctx context.Context, w *Web, enrollment string, inst StateIns
 // productionEnv is the setting of the command: the address filter without exceptions, the
 // system's roots, the real time values, the CAs of cas.md and the log list of Google.
 func productionEnv() Env {
-	return Env{Timing: DefaultTiming, Unpair: unpairInstallation, CAs: DefaultCAs}
+	return Env{Timing: DefaultTiming, Unpair: unpairInstallation, CAs: DefaultCAs, Sources: DefaultSources}
 }
 
 // Result is the outcome of a run or a clean-up.
@@ -74,6 +88,8 @@ type Result struct {
 	Exit int
 	// Message is a line for the error output; empty if there is nothing to say.
 	Message string
+	// CTFile is the file for -ct-verify that the run wrote, empty if it wrote none.
+	CTFile string
 }
 
 // Execute runs the live test as the command does.
@@ -84,6 +100,11 @@ func Execute(ctx context.Context, s Settings) Result {
 // ExecuteCleanup unpairs what the state file at s.CleanupPath lists, as the command does.
 func ExecuteCleanup(ctx context.Context, s Settings) Result {
 	return CleanupWith(ctx, s, productionEnv())
+}
+
+// ExecuteCTVerify completes a production run with the file at s.CTVerifyPath, as the command does.
+func ExecuteCTVerify(ctx context.Context, s Settings) Result {
+	return CTVerifyWith(ctx, s, productionEnv())
 }
 
 // classRunner plays the checks of one class.
@@ -110,8 +131,11 @@ type run struct {
 	rep     Report
 	runners map[string]classRunner
 
-	state         *StateFile
-	statePath     string
+	state     *StateFile
+	statePath string
+	started   time.Time
+	// ct is the certificate of the class issuance that -ct-verify checks later.
+	ct            *ctCertificate
 	enrollURL     string
 	meta          *metadataDoc
 	scr           scriptState
@@ -123,7 +147,7 @@ type run struct {
 func newRun(s Settings, env Env) *run {
 	manifest := sha256.Sum256(must(fs.ReadFile(relay.FS(), relay.ManifestPath)))
 	r := &run{
-		s: s, env: env, web: newWeb(env),
+		s: s, env: env, web: newWeb(env), started: time.Now(),
 		runners: map[string]classRunner{ClassMetadata: runMetadata, ClassEnrollment: runEnrollment, ClassDNS: runDNS,
 			ClassRelay: runRelay, ClassIssuance: runIssuance},
 		rep: Report{
@@ -147,8 +171,8 @@ func RunWith(ctx context.Context, s Settings, env Env) Result {
 // in classes that do not exist yet.
 func runWith(ctx context.Context, s Settings, env Env, prepare func(*run)) Result {
 	s, err := s.Validate()
-	if err == nil && s.CleanupPath != "" {
-		err = usagef("a run takes no state file to clean up")
+	if err == nil && (s.CleanupPath != "" || s.CTVerifyPath != "") {
+		err = usagef("a run takes no state file to clean up and no file of -ct-verify")
 	}
 	if err != nil {
 		return Result{Exit: ExitUsage, Message: err.Error()}
@@ -159,7 +183,10 @@ func runWith(ctx context.Context, s Settings, env Env, prepare func(*run)) Resul
 	}
 	r.exec(ctx)
 	r.cleanup()
-	return r.result()
+	file := r.writeCTFile()
+	res := r.result()
+	res.CTFile = file
+	return res
 }
 
 // exec plays the classes. A panic is caught here, so that the clean-up still runs.

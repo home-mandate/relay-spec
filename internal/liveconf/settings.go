@@ -72,6 +72,9 @@ type Settings struct {
 	// CleanupPath, if set, makes the call a clean-up of the state file at this path; no
 	// other setting but Timeout, DNSHook and DNSManual may be set.
 	CleanupPath string
+	// CTVerifyPath, if set, makes the call the completion of a production run with the file it
+	// wrote (RELAY-v0 section 8.3); no other setting but Timeout may be set.
+	CTVerifyPath string
 	// Timeout limits the run; zero means MaxTimeout.
 	Timeout time.Duration
 	// Version is the version of the tool for the report.
@@ -112,6 +115,13 @@ func (s Settings) Validate() (Settings, error) {
 	}
 	if s.DNSHook != "" && !isCommandLine(s.DNSHook) {
 		return s, usagef("the DNS hook is not a command")
+	}
+	if s.CTVerifyPath != "" {
+		if s.Operator != "" || len(s.Classes) > 0 || len(s.Codes) > 0 || s.OwnDomain != "" || s.StatePath != "" ||
+			s.ACMEProduction || s.CleanupPath != "" || s.DNSHook != "" || s.DNSManual {
+			return s, usagef("-ct-verify takes only the file of a run")
+		}
+		return s, nil
 	}
 	if s.CleanupPath != "" {
 		if s.Operator != "" || len(s.Classes) > 0 || len(s.Codes) > 0 || s.OwnDomain != "" || s.StatePath != "" || s.ACMEProduction {

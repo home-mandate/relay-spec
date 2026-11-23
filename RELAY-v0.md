@@ -1577,12 +1577,24 @@ test logs that no public log list contains, so Certificate Transparency is check
 production environment (`-acme-production`), in which the run obtains one real certificate for the
 standard name. There the tool checks that the certificate carries valid SCTs of logs of at least
 two operators of the log list that Google publishes, after verifying the signature of the list
-with Google's key. Called again with `-ct-verify` and the state file of the run, once the maximum
-merge delay of these logs has passed, it fetches inclusion proofs directly from the logs, without a
-monitoring service in between, and checks through two sources of `ct-sources.md` of the
-Home-Mandate Specification that Certificate Transparency shows no other certificate for the
-standard name since the pairing. The test shows a correct setup at one time; it cannot rule out an
-operator that deceives on purpose later, which the monitoring of the gateway covers (Section 6.7).
+with Google's key. The run leaves a file next to its state file with the certificate, its issuer and
+the report so far, and no key. Called with `-ct-verify` and that file, the tool asks every log of
+the list that gave the certificate an SCT directly, without a monitoring service in between,
+whether its latest tree head includes the certificate: an RFC 6962 log by its signed tree head and
+an inclusion proof, a tiled log (the static-ct-api of C2SP) by its checkpoint and its hash tiles
+at the index that its SCT names. It verifies the tree head with the key of the log in the list.
+A log that does not include the certificate yet, before its maximum merge delay has passed since
+the SCT, makes the result incomplete until then, and the call can be repeated; a log that does
+not answer, or whose tree head does not verify with the key of the list, does so as well, because
+that says nothing about the entry. A log that does not include the certificate in a tree head
+from after its maximum merge delay, or whose proof does not lead to its verified tree head, fails
+the check. Through the two sources of
+`ct-sources.md` of the Home-Mandate Specification, both of which must answer, the tool also checks
+that Certificate Transparency shows no certificate for the standard name, or for a wildcard name
+that covers it, with another key than the one of the run, that is valid at some time since the
+run began. It then writes the report of the whole run. The test shows a correct setup at one
+time; it cannot rule out an operator that deceives on purpose later, which the monitoring of the
+gateway covers (Section 6.7).
 
 The tool honours `Retry-After` and spaces its attempts, so that the limits of an operator do not
 fail it. A run creates at most two installations and unpairs every one it created before it ends, also when a
@@ -1807,6 +1819,13 @@ the household as the sections say:
   an account are among them. Section 8.4: a run in production obtains one real certificate.
   `cas.md` names the ACME directories and the account URI prefix of the test environment. Gateways
   are not affected; Section 12: none of this triggers an event.
+- Section 8.3: a production run leaves a file without keys, and `-ct-verify` with it completes the
+  run: inclusion of the certificate in every log of the list that gave it an SCT, from RFC 6962
+  logs by tree head and proof, from tiled logs (static-ct-api) by checkpoint and hash tiles, each
+  tree head verified with the key from the list; before a log's maximum merge delay a missing
+  entry makes the result incomplete, after it a failure, and a tree head that does not verify
+  leaves the result incomplete. The snapshot counts a certificate for the
+  standard name or a covering wildcard with another key that is valid at some time since the run.
 - Normative change, Sections 3 and 6.4: before its `from`, an operator MAY withdraw a planned set
   of relay addresses or move its `from` later, never earlier; a set with other addresses is a new
   set with its own 30 days, and a withdrawal ends the duty to accept agent connections at the

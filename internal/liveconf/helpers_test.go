@@ -46,6 +46,7 @@ func envFor(r *refop.Running) Env {
 		Unpair:  func(context.Context, *Web, string, StateInstallation, []StateKey) error { return nil },
 		CAs:     []CA{{Identity: refca.Identity, Production: ep, Staging: ep}},
 		LogList: func(context.Context) (*ctlog.List, error) { return ca.LogList(), nil },
+		Sources: CTSources{CertSpotter: ca.CertSpotter(), CrtSh: ca.CrtSh()},
 	}
 }
 
