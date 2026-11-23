@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/acme"
 )
@@ -61,6 +62,52 @@ func TestJudgeRefusalCountsOnlyCAA(t *testing.T) {
 		if (failure != "") != tt.failure || passed != tt.passed || !strings.Contains(incomplete, tt.incomplete) {
 			t.Errorf("%s: failure %q, passed %d, incomplete %q", name, failure, passed, incomplete)
 		}
+	}
+}
+
+// TestARefusalForAnotherReasonShowsWhatTheCASaid: the detail of the CA's problem goes into the
+// reason, quoted and cut, so that a refusal that decides nothing can be understood.
+func TestARefusalForAnotherReasonShowsWhatTheCASaid(t *testing.T) {
+	got := failed(&acme.Error{ProblemType: problemPrefix + "unauthorized", Detail: "Incorrect TXT record \"x\"\nfound"})
+	if got.problem != "unauthorized" || got.detail != "Incorrect TXT record \"x\"\nfound" {
+		t.Fatalf("%+v", got)
+	}
+	_, incomplete, _ := judged(func(is *issuing) { is.judgeRefusal(CheckIssuanceForeign, "an order", got) })
+	if !strings.Contains(incomplete, `(unauthorized: "Incorrect TXT record \"x\"\nfound")`) {
+		t.Errorf("incomplete %q", incomplete)
+	}
+	long := outcome{problem: "unauthorized", detail: strings.Repeat("a", 3*maxText)}
+	_, incomplete, _ = judged(func(is *issuing) { is.judgeRefusal(CheckIssuanceForeign, "an order", long) })
+	if strings.Contains(incomplete, strings.Repeat("a", maxText+1)) {
+		t.Errorf("the detail is not cut: %d characters", len(incomplete))
+	}
+	failure, _, _ := judged(func(is *issuing) { is.judgeIssue(got) })
+	if !strings.Contains(failure, "Incorrect TXT record") {
+		t.Errorf("failure of the own order %q", failure)
+	}
+}
+
+// TestAnOrderTheToolStoppedIsNotTheCA: when the tool's own time ends before it asks the CA, the
+// reason says so and does not blame the CA.
+func TestAnOrderTheToolStoppedIsNotTheCA(t *testing.T) {
+	stopped := outcome{stopped: true}
+	_, incomplete, _ := judged(func(is *issuing) { is.judgeRefusal(CheckIssuanceForeign, "an order", stopped) })
+	if !strings.Contains(incomplete, "before the CA was asked") || strings.Contains(incomplete, "cannot be reached") {
+		t.Errorf("refusal: %q", incomplete)
+	}
+	failure, incomplete, _ := judged(func(is *issuing) { is.judgeIssue(stopped) })
+	if failure != "" || !strings.Contains(incomplete, "before the CA was asked") {
+		t.Errorf("issue: failure %q, incomplete %q", failure, incomplete)
+	}
+}
+
+// TestATTLUnitOfZeroIsASecond: a timing without TTLUnit still waits out the TTL.
+func TestATTLUnitOfZeroIsASecond(t *testing.T) {
+	if got := ttlWait(Timing{}, 60); got != 61*time.Second {
+		t.Errorf("wait %v", got)
+	}
+	if got := ttlWait(Timing{TTLUnit: time.Millisecond}, 0); got != 0 {
+		t.Errorf("nothing published before: wait %v", got)
 	}
 }
 

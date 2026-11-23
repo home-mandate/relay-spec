@@ -24,6 +24,8 @@ type Timing struct {
 	RetryBudget time.Duration
 	// RetryUnit is the length of the second of a Retry-After value.
 	RetryUnit time.Duration
+	// TTLUnit is the length of the second of a TTL that the tool waits out.
+	TTLUnit time.Duration
 	// Gap is the least time between two connections: at most ten connections a second.
 	Gap time.Duration
 	// Tunnel is how long the tool waits for the relay's answer to a frame or a stream-open.
@@ -58,6 +60,7 @@ var DefaultTiming = Timing{
 	Cleanup:       5 * time.Minute,
 	RetryBudget:   5 * time.Minute,
 	RetryUnit:     time.Second,
+	TTLUnit:       time.Second,
 	Gap:           100 * time.Millisecond,
 	Jitter:        400 * time.Millisecond,
 	Tunnel:        5 * time.Second,

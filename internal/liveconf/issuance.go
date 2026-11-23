@@ -80,6 +80,8 @@ type issuing struct {
 	ep       Endpoint
 	name     string
 	accounts []*acme.Client
+	// kept is the longest TTL of the challenge values published so far, in seconds.
+	kept uint32
 }
 
 // outcome is how an order ended: with a certificate, refused by the CA with a problem type,
@@ -89,9 +91,16 @@ type outcome struct {
 	key   *ecdsa.PublicKey
 	// problem is the ACME problem type without its prefix, or a word of the tool.
 	problem string
+	// detail is what the CA said about the problem.
+	detail string
 	// unreachable is the kind of a network failure.
 	unreachable string
+	// stopped is set when the tool's own time ended before it asked the CA.
+	stopped bool
 }
+
+// reasonStopped is why an order that the tool stopped before asking the CA decides nothing.
+const reasonStopped = "the time of the tool ended before the CA was asked for "
 
 // Words of the tool for an order that did not reach the CA's decision.
 const (
@@ -151,30 +160,45 @@ func (is *issuing) clearChallenge() {
 	}
 }
 
-// play orders the certificate, the wildcard name and the certificate for an account that was
-// not reported, and checks the SCTs.
+// play orders the certificate, then the wildcard name and the certificate for an account that
+// was not reported together, and checks the SCTs (RELAY-v0 section 8.3).
 func (is *issuing) play(ctx context.Context, own *acme.Client) error {
-	got, err := is.order(ctx, own, is.name)
+	got, err := is.orders(ctx, []wanted{{own, is.name}})
 	if err != nil {
 		return err
 	}
-	is.judgeIssue(got)
-	wild, err := is.order(ctx, own, "*."+is.name)
-	if err != nil {
+	is.judgeIssue(got[0])
+	if err := is.refusals(ctx, own); err != nil {
 		return err
 	}
-	is.judgeRefusal(CheckIssuanceWildcard, "an order for the wildcard name", wild)
-	foreign, _, rerr := is.register(ctx)
-	if rerr != nil {
-		is.s.r.incomplete("the CA cannot be reached (" + classify(rerr).kind + ") for a second account")
-	} else {
-		other, err := is.order(ctx, foreign, is.name)
-		if err != nil {
-			return err
+	is.checkSCTs(ctx, got[0])
+	return nil
+}
+
+// refusals orders the wildcard name and, with a second account that is never reported, the
+// standard name; the CA has to refuse both.
+func (is *issuing) refusals(ctx context.Context, own *acme.Client) error {
+	const wildcard, foreign = "an order for the wildcard name", "an order of an account that was not reported"
+	if is.kept > maxCacheWait {
+		for _, what := range []string{wildcard, foreign} {
+			is.s.r.incomplete(fmt.Sprintf("the challenge records have a TTL of %d seconds, more than the %d seconds the tool waits for a CA to forget them, so %s was not placed", is.kept, maxCacheWait, what))
 		}
-		is.judgeRefusal(CheckIssuanceForeign, "an order of an account that was not reported", other)
+		return nil
 	}
-	is.checkSCTs(ctx, got)
+	checks, whats := []string{CheckIssuanceWildcard}, []string{wildcard}
+	all := []wanted{{own, "*." + is.name}}
+	if other, _, err := is.register(ctx); err != nil {
+		is.s.r.incomplete("the CA cannot be reached (" + classify(err).kind + ") for a second account")
+	} else {
+		checks, whats, all = append(checks, CheckIssuanceForeign), append(whats, foreign), append(all, wanted{other, is.name})
+	}
+	got, err := is.orders(ctx, all)
+	if err != nil {
+		return err
+	}
+	for i, o := range got {
+		is.judgeRefusal(checks[i], whats[i], o)
+	}
 	return nil
 }
 
@@ -202,84 +226,8 @@ func (is *issuing) deactivate() {
 	}
 }
 
-// order asks for a certificate for the identifier through DNS-01, with the key authorization
-// published through the operator's challenge endpoint. Only a failure of the operator is an error.
-func (is *issuing) order(ctx context.Context, c *acme.Client, id string) (outcome, error) {
-	ctx, cancel := context.WithTimeout(ctx, is.s.r.env.Timing.Slow)
-	defer cancel()
-	o, err := c.AuthorizeOrder(ctx, acme.DomainIDs(id))
-	if err != nil {
-		return failed(err), nil
-	}
-	for _, u := range o.AuthzURLs {
-		ended, err := is.authorize(ctx, c, u)
-		if err != nil || ended != nil {
-			return derefOutcome(ended), err
-		}
-	}
-	key := must(ecdsa.GenerateKey(elliptic.P256(), rand.Reader))
-	csr := must(x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{DNSNames: []string{id}}, key))
-	chain, _, err := c.CreateOrderCert(ctx, o.FinalizeURL, csr, true)
-	if err != nil {
-		return failed(err), nil
-	}
-	return outcome{chain: chain, key: &key.PublicKey}, nil
-}
-
-func derefOutcome(o *outcome) outcome {
-	if o == nil {
-		return outcome{}
-	}
-	return *o
-}
-
-// authorize completes one authorization; a non-nil outcome ends the order.
-func (is *issuing) authorize(ctx context.Context, c *acme.Client, u string) (*outcome, error) {
-	z, err := c.GetAuthorization(ctx, u)
-	if err != nil {
-		o := failed(err)
-		return &o, nil
-	}
-	if z.Status == acme.StatusValid {
-		return nil, nil
-	}
-	i := slices.IndexFunc(z.Challenges, func(ch *acme.Challenge) bool { return ch.Type == "dns-01" })
-	if i < 0 {
-		return &outcome{problem: problemNoDNS01}, nil
-	}
-	chal := z.Challenges[i]
-	value := must(c.DNS01ChallengeRecord(chal.Token))
-	_, err = is.s.c.Challenge(ctx, is.b.id, is.b.paired.Installation.ACMEChallenge, []string{value})
-	name, fatal := apiName(err)
-	switch {
-	case fatal != nil:
-		return nil, fatal
-	case undecided(name):
-		return &outcome{problem: "operator-" + name}, nil
-	case err != nil:
-		return &outcome{problem: problemChallengeRefused}, nil
-	}
-	// The gateway checks the record itself before it asks the CA to validate (RELAY-v0 section
-	// 5.6). The end of the tool's own time limit is no failure of the operator.
-	if err := is.s.dns.waitTXT(ctx, "_acme-challenge."+z.Identifier.Value, value); err != nil {
-		if ctx.Err() != nil {
-			return &outcome{unreachable: kindTimeout}, nil
-		}
-		return &outcome{problem: problemNotVisible}, nil
-	}
-	if _, err := c.Accept(ctx, chal); err != nil {
-		o := failed(err)
-		return &o, nil
-	}
-	if _, err := c.WaitAuthorization(ctx, u); err != nil {
-		o := failed(err)
-		return &o, nil
-	}
-	return nil, nil
-}
-
-// failed classifies an error of the ACME client by its problem type, which the tool shows
-// only as a short word.
+// failed classifies an error of the ACME client by its problem type, which the tool shows as a
+// short word, and keeps what the CA said about it.
 func failed(err error) outcome {
 	var authz *acme.AuthorizationError
 	var problem *acme.Error
@@ -288,12 +236,12 @@ func failed(err error) outcome {
 	case errors.As(err, &authz):
 		for _, e := range authz.Errors {
 			if errors.As(e, &problem) {
-				return outcome{problem: problemName(problem.ProblemType)}
+				return outcome{problem: problemName(problem.ProblemType), detail: problem.Detail}
 			}
 		}
 		return outcome{problem: "invalid-authorization"}
 	case errors.As(err, &problem):
-		return outcome{problem: problemName(problem.ProblemType)}
+		return outcome{problem: problemName(problem.ProblemType), detail: problem.Detail}
 	case errors.As(err, &ord):
 		return outcome{problem: "invalid-order"}
 	}
@@ -309,10 +257,20 @@ func problemName(t string) string {
 	return name
 }
 
+// cause is the problem of the outcome with what the CA said about it, quoted and cut.
+func (o outcome) cause() string {
+	if o.detail == "" {
+		return o.problem
+	}
+	return o.problem + ": " + esc(o.detail)
+}
+
 // judgeIssue judges the order of the reported account: it must give a certificate for the
 // standard name with the tool's key.
 func (is *issuing) judgeIssue(o outcome) {
 	switch {
+	case o.stopped:
+		is.s.r.incomplete(reasonStopped + "the order of the reported account")
 	case o.unreachable != "":
 		is.s.r.incomplete("the CA cannot be reached (" + o.unreachable + ") for the order of the reported account")
 	case len(o.chain) > 0:
@@ -326,15 +284,15 @@ func (is *issuing) judgeIssue(o outcome) {
 			is.s.rec(CheckIssuanceIssue, "")
 		}
 	case o.problem == "caa":
-		is.s.rec(CheckIssuanceIssue, "the CA refused the reported account because of the CAA records it sees (caa)")
+		is.s.rec(CheckIssuanceIssue, "the CA refused the reported account because of the CAA records it sees ("+o.cause()+")")
 	case o.problem == "unauthorized" || o.problem == "incorrectResponse":
-		is.s.rec(CheckIssuanceIssue, "the CA did not find the challenge value that the operator published ("+o.problem+")")
+		is.s.rec(CheckIssuanceIssue, "the CA did not find the challenge value that the operator published ("+o.cause()+")")
 	case o.problem == problemChallengeRefused:
 		is.s.rec(CheckIssuanceIssue, "the operator refused the challenge value of the order")
 	case o.problem == problemNotVisible:
 		is.s.rec(CheckIssuanceIssue, "the challenge value did not show on the name servers of the name domain")
 	default:
-		is.s.r.incomplete(fmt.Sprintf("the CA refused the order of the reported account (%s), so the issuance could not be judged", o.problem))
+		is.s.r.incomplete(fmt.Sprintf("the CA refused the order of the reported account (%s), so the issuance could not be judged", o.cause()))
 	}
 }
 
@@ -342,6 +300,8 @@ func (is *issuing) judgeIssue(o outcome) {
 // for another reason decides nothing, because a CA checks CAA only after the validation.
 func (is *issuing) judgeRefusal(id, what string, o outcome) {
 	switch {
+	case o.stopped:
+		is.s.r.incomplete(reasonStopped + what)
 	case len(o.chain) > 0:
 		is.s.rec(id, "the CA issued a certificate for "+what)
 	case o.problem == "caa":
@@ -349,7 +309,7 @@ func (is *issuing) judgeRefusal(id, what string, o outcome) {
 	case o.unreachable != "":
 		is.s.r.incomplete("the CA cannot be reached (" + o.unreachable + ") for " + what)
 	default:
-		is.s.r.incomplete(fmt.Sprintf("the CA refused %s for another reason than CAA (%s), so the refusal could not be judged", what, o.problem))
+		is.s.r.incomplete(fmt.Sprintf("the CA refused %s for another reason than CAA (%s), so the refusal could not be judged", what, o.cause()))
 	}
 }
 

@@ -11,7 +11,9 @@
 // pairing codes and no DNS hook, so the loopback addresses and the short time values it allows
 // can never be used against a real operator. relay-conformance itself never allows them.
 //
-// For the live runs before a release, the class issuance runs against a real CA (live.go):
+// For the live runs before a release, the class issuance runs against a real CA (live.go). They
+// are the maintainers' proof that the test tool and the reference hold against a real CA; an
+// operator tests its own operation with relay-conformance:
 //
 //	relay-reference -live staging|production -zone <delegated zone> -dns-listen <address>...
 //	                -ns-address <address>... -state <directory> -report <file>
@@ -178,7 +180,7 @@ func finish(res liveconf.Result, reportPath string, stdout, stderr io.Writer) in
 func referenceTiming() liveconf.Timing {
 	return liveconf.Timing{
 		Request: 5 * time.Second, Slow: 10 * time.Second, Hook: 5 * time.Second, Visible: 2 * time.Second, Poll: 20 * time.Millisecond,
-		Cleanup: 5 * time.Second, RetryBudget: 300 * time.Millisecond, RetryUnit: 10 * time.Millisecond,
+		Cleanup: 5 * time.Second, RetryBudget: 300 * time.Millisecond, RetryUnit: 10 * time.Millisecond, TTLUnit: 10 * time.Millisecond,
 		Tunnel: 3 * time.Second, Close: 2 * time.Second, Slack: 150 * time.Millisecond, ControlWindow: 120 * time.Millisecond, Deny: 600 * time.Millisecond,
 	}
 }

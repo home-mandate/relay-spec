@@ -96,10 +96,17 @@ type world struct {
 
 func newWorld(t *testing.T, faults refca.Fault) *world {
 	t.Helper()
+	return newWorldWith(t, refca.Config{Faults: faults})
+}
+
+// newWorldWith is a world with a CA of the configuration, which looks up the world's zone.
+func newWorldWith(t *testing.T, cfg refca.Config) *world {
+	t.Helper()
 	z := &zone{txt: map[string][]string{}, caa: map[string][]dnsq.CAA{
 		"homes.example.org": {issue(";"), issuewild(";")},
 	}}
-	ca := refca.New(refca.Config{DNS: z, Faults: faults})
+	cfg.DNS = z
+	ca := refca.New(cfg)
 	srv := httptest.NewUnstartedServer(ca.Handler())
 	srv.TLS = &tls.Config{MinVersion: tls.VersionTLS13}
 	srv.StartTLS()
@@ -216,6 +223,41 @@ func TestTheCleanCAIssuesOnlyAsTheCAARecordsSay(t *testing.T) {
 	}
 	if n := len(w.ca.Issued()); n != 1 {
 		t.Errorf("%d certificates issued", n)
+	}
+}
+
+// TestACAKeepsATXTAnswerForTXTCache: like the resolver of a real CA, the CA keeps the TXT
+// records it looked up for TXTCache, so that a value that replaces them is found only after.
+func TestACAKeepsATXTAnswerForTXTCache(t *testing.T) {
+	const keep = 300 * time.Millisecond
+	w := newWorldWith(t, refca.Config{TXTCache: keep})
+	a, acctA := w.account(t)
+	b, _ := w.account(t)
+	w.permit(acctA)
+	if _, err := w.order(t, a, name, true); err != nil {
+		t.Fatalf("the reported account: %v", err)
+	}
+	if _, err := w.order(t, b, name, true); problemType(err) != "unauthorized" {
+		t.Errorf("within TXTCache: %s, want unauthorized", problemType(err))
+	}
+	time.Sleep(keep)
+	if _, err := w.order(t, b, name, true); problemType(err) != "caa" {
+		t.Errorf("after TXTCache: %s, want caa", problemType(err))
+	}
+}
+
+// TestACAKeepsNoFailedLookUp: an error of DNS is not kept.
+func TestACAKeepsNoFailedLookUp(t *testing.T) {
+	w := newWorldWith(t, refca.Config{TXTCache: time.Minute})
+	a, acctA := w.account(t)
+	w.permit(acctA)
+	w.zone.setFail(true)
+	if _, err := w.order(t, a, name, true); problemType(err) != "dns" {
+		t.Errorf("with SERVFAIL: %s, want dns", problemType(err))
+	}
+	w.zone.setFail(false)
+	if _, err := w.order(t, a, name, true); err != nil {
+		t.Errorf("after SERVFAIL: %v", err)
 	}
 }
 

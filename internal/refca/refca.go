@@ -76,6 +76,9 @@ type Config struct {
 	DNS Resolver
 	// Faults are the defects of the CA.
 	Faults Fault
+	// TXTCache, if set, is how long the CA keeps the TXT records it looked up, as the resolver
+	// of a real CA keeps an answer for its TTL; zero keeps nothing.
+	TXTCache time.Duration
 }
 
 const (
@@ -106,6 +109,14 @@ type CA struct {
 	issued   []*x509.Certificate
 	// listed are the certificates the search sources show.
 	listed []listed
+	// txt are the TXT records kept for TXTCache, by name.
+	txt map[string]keptTXT
+}
+
+// keptTXT is a TXT answer the CA keeps until a time.
+type keptTXT struct {
+	values []string
+	until  time.Time
 }
 
 type account struct {
@@ -146,7 +157,7 @@ func New(cfg Config) *CA {
 	cert := must(x509.ParseCertificate(must(x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key))))
 	c := &CA{cfg: cfg, key: key, cert: cert, serial: big.NewInt(1),
 		nonces: map[string]bool{}, accounts: map[string]*account{}, orders: map[string]*order{},
-		authzs: map[string]*authz{}, certs: map[string][][]byte{}}
+		authzs: map[string]*authz{}, certs: map[string][][]byte{}, txt: map[string]keptTXT{}}
 	// Log A follows RFC 6962, log B is tiled; both include at once (a maximum merge delay of 0).
 	a := reflog.New(c.url("/logs/a/"), false)
 	a.SetInclude(!cfg.Faults.Has(NotIncluded))
