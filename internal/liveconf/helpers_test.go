@@ -14,7 +14,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/home-mandate/relay-spec/internal/ctlog"
 	"github.com/home-mandate/relay-spec/internal/netguard"
+	"github.com/home-mandate/relay-spec/internal/refca"
 	"github.com/home-mandate/relay-spec/internal/refop"
 )
 
@@ -31,14 +33,19 @@ func testTiming() Timing {
 // operator listens.
 func loopbackPolicy(a netip.Addr) bool { return netguard.Allowed(a) || a.IsLoopback() }
 
-// envFor is the environment for a reference operator.
+// envFor is the environment for a reference operator, with its reference CA in both
+// environments and the logs of that CA as the log list.
 func envFor(r *refop.Running) Env {
+	ca := r.Operator.CA()
+	ep := Endpoint{Directory: ca.Directory(), AccountPrefix: ca.AccountPrefix()}
 	return Env{
-		Net:    netguard.Options{Policy: loopbackPolicy, Remap: r.Remap, Lookup: r.Lookup},
-		NS:     r.NS,
-		Roots:  r.Roots,
-		Timing: testTiming(),
-		Unpair: func(context.Context, *Web, string, StateInstallation, []StateKey) error { return nil },
+		Net:     netguard.Options{Policy: loopbackPolicy, Remap: r.Remap, Lookup: r.Lookup},
+		NS:      r.NS,
+		Roots:   r.Roots,
+		Timing:  testTiming(),
+		Unpair:  func(context.Context, *Web, string, StateInstallation, []StateKey) error { return nil },
+		CAs:     []CA{{Identity: refca.Identity, Production: ep, Staging: ep}},
+		LogList: func(context.Context) (*ctlog.List, error) { return ca.LogList(), nil },
 	}
 }
 

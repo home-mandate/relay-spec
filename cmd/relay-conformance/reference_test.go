@@ -15,8 +15,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/home-mandate/relay-spec/internal/ctlog"
 	"github.com/home-mandate/relay-spec/internal/liveconf"
 	"github.com/home-mandate/relay-spec/internal/netguard"
+	"github.com/home-mandate/relay-spec/internal/refca"
 	"github.com/home-mandate/relay-spec/internal/refop"
 	"github.com/home-mandate/relay-spec/internal/refrelay"
 )
@@ -73,7 +75,9 @@ func referenceExecutor(t *testing.T, faults refrelay.Fault) (executor, []string,
 			Cleanup: 5 * time.Second, RetryBudget: 300 * time.Millisecond, RetryUnit: 10 * time.Millisecond,
 			Tunnel: 3 * time.Second, Close: 2 * time.Second, Slack: 150 * time.Millisecond, ControlWindow: 120 * time.Millisecond, Deny: 600 * time.Millisecond,
 		},
-		Unpair: liveconf.UnpairInstallation,
+		Unpair:  liveconf.UnpairInstallation,
+		CAs:     []liveconf.CA{{Identity: refca.Identity, Production: caEndpoint(r), Staging: caEndpoint(r)}},
+		LogList: func(context.Context) (*ctlog.List, error) { return r.Operator.CA().LogList(), nil },
 	}
 	ex := executor{
 		run: func(ctx context.Context, s liveconf.Settings) liveconf.Result { return liveconf.RunWith(ctx, s, env) },
@@ -83,13 +87,19 @@ func referenceExecutor(t *testing.T, faults refrelay.Fault) (executor, []string,
 	}
 	return ex, []string{
 		"-operator", refop.DefaultOperator, "-code", refop.DefaultCodes[0], "-code", refop.DefaultCodes[1],
-		"-own-domain", "home." + refop.DefaultTesterZone, "-dns-hook", hook,
+		"-own-domain", "home." + refop.DefaultTesterZone, "-dns-hook", hook, "-acme-production",
 	}, r
 }
 
-// TestTheCommandAgainstTheReference: through run, the clean reference exits 0 with a report that
-// says all four classes conform, a defect exits 1 with the failed check in the report, and neither
-// the output nor the report holds an installation URL or a pairing code.
+// caEndpoint is the ACME endpoint of the reference CA of the operator.
+func caEndpoint(r *refop.Running) liveconf.Endpoint {
+	return liveconf.Endpoint{Directory: r.Operator.CA().Directory(), AccountPrefix: r.Operator.CA().AccountPrefix()}
+}
+
+// TestTheCommandAgainstTheReference: through run, the clean reference exits 3 with a report that
+// says every class but issuance conforms and that only the checks of -ct-verify are missing (the
+// next version of the tool has them and makes it exit 0), a defect exits 1 with the failed check
+// in the report, and neither the output nor the report holds an installation URL or a pairing code.
 func TestTheCommandAgainstTheReference(t *testing.T) {
 	for name, tt := range map[string]struct {
 		faults    refrelay.Fault
@@ -97,7 +107,7 @@ func TestTheCommandAgainstTheReference(t *testing.T) {
 		conforms  bool
 		failedIDs []string
 	}{
-		"clean reference": {0, 0, true, nil},
+		"clean reference": {0, liveconf.ExitIncomplete, false, nil},
 		"R1 TLS 1.2":      {refrelay.TLS12, 1, false, []string{"relay.tls"}},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -126,9 +136,12 @@ func TestTheCommandAgainstTheReference(t *testing.T) {
 				t.Errorf("report: spec %q, conforms %v, failures %v", rep.Spec, rep.Conforms, ids)
 			}
 			for _, class := range liveconf.AllClasses {
-				if c := rep.Classes[class]; c == nil || c.NotRun || (tt.conforms && !c.Conforms) {
+				if c := rep.Classes[class]; c == nil || c.NotRun || (tt.failedIDs == nil && c.Conforms != (class != liveconf.ClassIssuance)) {
 					t.Errorf("class %s: %+v", class, c)
 				}
+			}
+			if tt.failedIDs == nil && (len(rep.Incomplete) != 2 || !strings.Contains(rep.Incomplete[0], "-ct-verify")) {
+				t.Errorf("incomplete %v", rep.Incomplete)
 			}
 			if rep.Installations.Created != 2 || rep.Installations.Unpaired != 2 {
 				t.Errorf("installations %+v", rep.Installations)

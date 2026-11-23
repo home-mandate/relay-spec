@@ -13,7 +13,7 @@ FUZZTIME       ?= 10m
 # package:target; scheduled.yml and the release gate of release.yml fuzz this list (make fuzz-targets)
 FUZZ_TARGETS   := internal/dnsq:FuzzCAA internal/tunnelclient:FuzzPROXY internal/frames:FuzzReadFrame \
 	internal/frames:FuzzBind internal/tunnelcert:FuzzHomeIDOf internal/tunnelcert:FuzzCheckCSR \
-	internal/request:FuzzVerifyRequest
+	internal/request:FuzzVerifyRequest internal/ctlog:FuzzSCTList
 
 .PHONY: check lint test cover vet modverify staticcheck vulncheck actionlint secrets hooks fuzz fuzz-one fuzz-targets manifest
 

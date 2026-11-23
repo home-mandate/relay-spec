@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package liveconf runs the live test of an operator (RELAY-v0 section 8.3): the run flow,
-// the checks of the four conformance classes as a table with fixed IDs, the report, the
+// the checks of the five conformance classes as a table with fixed IDs, the report, the
 // state file that lets an interrupted run be cleaned up, and the time values. The tool
 // relay-conformance is a thin command line around it.
 //
-// All four classes are implemented. The classes enrollment, dns and relay share one sequence
-// (the installations and their tunnel certificates are the same), so a check of one class that
+// All five classes are implemented; the class issuance leaves the checks of -ct-verify to a
+// later version. The classes enrollment, dns, relay and issuance share one sequence (the
+// installations and their tunnel certificates are the same), so a check of one class that
 // needs the state another leaves behind is played at the point of the sequence where that state
 // exists.
 package liveconf
@@ -26,10 +27,11 @@ const (
 	ClassEnrollment = "enrollment"
 	ClassDNS        = "dns"
 	ClassRelay      = "relay"
+	ClassIssuance   = "issuance"
 )
 
 // AllClasses lists the classes in the order of a run.
-var AllClasses = []string{ClassMetadata, ClassEnrollment, ClassDNS, ClassRelay}
+var AllClasses = []string{ClassMetadata, ClassEnrollment, ClassDNS, ClassRelay, ClassIssuance}
 
 const (
 	// MaxCodes is how many pairing codes a run uses: a run creates at most two installations.
@@ -50,7 +52,7 @@ var ErrUsage = errors.New("liveconf: invalid settings")
 type Settings struct {
 	// Operator is the operator domain.
 	Operator string
-	// Classes are the classes to run; empty means all. A run of fewer than all four is never
+	// Classes are the classes to run; empty means all. A run of fewer than all five is never
 	// conformant.
 	Classes []string
 	// Codes are pairing codes of the test account, as given.
@@ -61,6 +63,10 @@ type Settings struct {
 	DNSHook string
 	// DNSManual asks the tester to set the record by hand.
 	DNSManual bool
+	// ACMEProduction makes the class issuance use the production environment of the CA, which
+	// issues a real certificate; otherwise it uses the test environment, which checks no
+	// Certificate Transparency (RELAY-v0 section 8.3).
+	ACMEProduction bool
 	// StatePath is where the state file goes; empty means a new file in the working directory.
 	StatePath string
 	// CleanupPath, if set, makes the call a clean-up of the state file at this path; no
@@ -108,7 +114,7 @@ func (s Settings) Validate() (Settings, error) {
 		return s, usagef("the DNS hook is not a command")
 	}
 	if s.CleanupPath != "" {
-		if s.Operator != "" || len(s.Classes) > 0 || len(s.Codes) > 0 || s.OwnDomain != "" || s.StatePath != "" {
+		if s.Operator != "" || len(s.Classes) > 0 || len(s.Codes) > 0 || s.OwnDomain != "" || s.StatePath != "" || s.ACMEProduction {
 			return s, usagef("a clean-up takes only the state file")
 		}
 		return s, nil

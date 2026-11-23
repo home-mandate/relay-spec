@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/home-mandate/relay-spec/internal/liveconf"
@@ -21,10 +22,12 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// TestTheReferenceConformsToEveryClass: the reference passes every check this version of the
+// tool makes; only the checks of -ct-verify are missing, which the next version adds.
 func TestTheReferenceConformsToEveryClass(t *testing.T) {
 	report := filepath.Join(t.TempDir(), "report.json")
 	var out, errOut bytes.Buffer
-	if code := run(context.Background(), []string{"-report", report}, &out, &errOut); code != liveconf.ExitConforms {
+	if code := run(context.Background(), []string{"-report", report}, &out, &errOut); code != liveconf.ExitIncomplete {
 		t.Fatalf("exit %d\n%s\n%s", code, out.String(), errOut.String())
 	}
 	data, err := os.ReadFile(report)
@@ -35,11 +38,14 @@ func TestTheReferenceConformsToEveryClass(t *testing.T) {
 	if err := json.Unmarshal(data, &rep); err != nil {
 		t.Fatal(err)
 	}
-	if !rep.Conforms || rep.Spec != liveconf.SpecName || rep.Version != version {
-		t.Errorf("report: conforms %v, spec %q, version %q", rep.Conforms, rep.Spec, rep.Version)
+	if rep.Conforms || len(rep.Failures) != 0 || rep.Spec != liveconf.SpecName || rep.Version != version {
+		t.Errorf("report: conforms %v, failures %v, spec %q, version %q", rep.Conforms, rep.Failures, rep.Spec, rep.Version)
+	}
+	if len(rep.Incomplete) != 2 || !strings.Contains(rep.Incomplete[0], "-ct-verify") {
+		t.Errorf("incomplete %v", rep.Incomplete)
 	}
 	for _, class := range liveconf.AllClasses {
-		if c := rep.Classes[class]; c == nil || c.NotRun || !c.Conforms {
+		if c := rep.Classes[class]; c == nil || c.NotRun || c.Failed != 0 || c.Conforms != (class != liveconf.ClassIssuance) {
 			t.Errorf("class %s: %+v", class, c)
 		}
 	}

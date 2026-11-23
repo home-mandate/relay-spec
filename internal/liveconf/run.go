@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/home-mandate/relay-spec"
+	"github.com/home-mandate/relay-spec/internal/ctlog"
 	"github.com/home-mandate/relay-spec/internal/enroll"
 	"github.com/home-mandate/relay-spec/internal/netguard"
 )
@@ -50,6 +51,10 @@ type Env struct {
 	Prompt io.Writer
 	// Unpair unpairs one test installation.
 	Unpair Unpairer
+	// CAs are the CAs the class issuance can use, with their ACME endpoints; nil means none.
+	CAs []CA
+	// LogList returns the log list for the SCTs; nil means the signed list of Google.
+	LogList func(ctx context.Context) (*ctlog.List, error)
 }
 
 // Unpairer unpairs a test installation with the keys of the run; enrollment is the URL of the
@@ -57,9 +62,9 @@ type Env struct {
 type Unpairer func(ctx context.Context, w *Web, enrollment string, inst StateInstallation, keys []StateKey) error
 
 // productionEnv is the setting of the command: the address filter without exceptions, the
-// system's roots, the real time values.
+// system's roots, the real time values, the CAs of cas.md and the log list of Google.
 func productionEnv() Env {
-	return Env{Timing: DefaultTiming, Unpair: unpairInstallation}
+	return Env{Timing: DefaultTiming, Unpair: unpairInstallation, CAs: DefaultCAs}
 }
 
 // Result is the outcome of a run or a clean-up.
@@ -119,11 +124,12 @@ func newRun(s Settings, env Env) *run {
 	manifest := sha256.Sum256(must(fs.ReadFile(relay.FS(), relay.ManifestPath)))
 	r := &run{
 		s: s, env: env, web: newWeb(env),
-		runners: map[string]classRunner{ClassMetadata: runMetadata, ClassEnrollment: runEnrollment, ClassDNS: runDNS, ClassRelay: runRelay},
+		runners: map[string]classRunner{ClassMetadata: runMetadata, ClassEnrollment: runEnrollment, ClassDNS: runDNS,
+			ClassRelay: runRelay, ClassIssuance: runIssuance},
 		rep: Report{
 			Spec: SpecName, Version: s.Version, Manifest: hex.EncodeToString(manifest[:]), Operator: s.Operator,
 			Date: time.Now().UTC().Format(dateLayout), Classes: map[string]*ClassResult{},
-			Failures: []Failure{}, Notes: []string{}, Incomplete: []string{},
+			Failures: []Failure{}, Notes: []string{}, Incomplete: []string{}, NotChecked: slices.Clone(NotChecked),
 		},
 	}
 	for _, class := range AllClasses {

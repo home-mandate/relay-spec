@@ -161,7 +161,7 @@ func (s *script) finish(complete bool) {
 		s.rl.close()
 		s.rl.record()
 	}
-	for _, class := range []string{ClassEnrollment, ClassDNS, ClassRelay} {
+	for _, class := range []string{ClassEnrollment, ClassDNS, ClassRelay, ClassIssuance} {
 		for _, c := range checksOf(class) {
 			if !s.seen[c.ID] && c.ID != CheckEnrollCases {
 				s.r.skip(class)
@@ -245,18 +245,15 @@ func randomCode() string {
 	return string(raw)
 }
 
-// accountPrefixes are the prefixes of the ACME account URIs of the CAs of cas.md; a test
-// compares them with that file.
-var accountPrefixes = map[string]string{
-	"letsencrypt.org": "https://acme-v02.api.letsencrypt.org/acme/acct/",
-}
-
 // accountURI returns the URI of an ACME account that belongs to nobody (RELAY-v0 section 8.3):
-// the prefix of the CA and a number far beyond every number the CA has assigned.
+// the prefix of the production environment of a CA of cas.md and a number far beyond every
+// number the CA has assigned.
 func accountURI(cas []string) (account, caaID string, ok bool) {
-	for _, ca := range cas {
-		if prefix, found := accountPrefixes[ca]; found {
-			return prefix + randomDigits(18), ca, true
+	for _, id := range cas {
+		for _, ca := range DefaultCAs {
+			if ca.Identity == id {
+				return ca.Production.AccountPrefix + randomDigits(18), id, true
+			}
 		}
 	}
 	return "", "", false

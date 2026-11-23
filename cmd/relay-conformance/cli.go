@@ -19,15 +19,18 @@ import (
 const usage = `usage:
   relay-conformance -operator <domain> [-code-file <file>]... [-code <code>]...
                     [-own-domain <name> (-dns-hook <command> | -dns-manual)]
-                    [-classes metadata,enrollment,dns,relay] [-report <file>]
-                    [-state <file>] [-timeout <duration>]
+                    [-classes metadata,enrollment,dns,relay,issuance] [-acme-production]
+                    [-report <file>] [-state <file>] [-timeout <duration>]
   relay-conformance -cleanup <state file> [-dns-hook <command> | -dns-manual]
   relay-conformance -list
 
 Pairing codes (at most two) come from -code-file (preferred: one code in the file), -code
 or, if neither is given, from the environment variable RELAY_CONFORMANCE_CODES (codes
 separated by commas or blanks). An operator conforms only with two codes and an own domain
-and with all four classes. -timeout is at most 1h.
+and with all five classes. The class issuance creates two accounts at a CA of acme_cas, agrees
+to its terms of service, and orders certificates for a standard name: in the CA's test
+environment, or with -acme-production in its production environment, which issues one real
+certificate and is needed for the checks of Certificate Transparency. -timeout is at most 1h.
 Exit codes: 0 conformant, 1 not conformant, 2 wrong call, 3 incomplete, 4 clean-up failed.
 `
 
@@ -69,6 +72,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 	flags.StringVar(&s.OwnDomain, "own-domain", "", "name in a zone of the tester")
 	flags.StringVar(&s.DNSHook, "dns-hook", "", "command that sets and removes the challenge TXT record")
 	flags.BoolVar(&s.DNSManual, "dns-manual", false, "set the challenge TXT record by hand")
+	flags.BoolVar(&s.ACMEProduction, "acme-production", false, "class issuance: use the production environment of the CA")
 	flags.StringVar(&s.StatePath, "state", "", "state file")
 	flags.StringVar(&s.CleanupPath, "cleanup", "", "state file of a run to clean up")
 	flags.StringVar(&classes, "classes", "", "classes to run, separated by commas")

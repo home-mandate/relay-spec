@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/home-mandate/relay-spec"
+	"github.com/home-mandate/relay-spec/internal/refca"
 )
 
 func fsReadFile(name string) ([]byte, error) { return fs.ReadFile(relay.FS(), name) }
@@ -37,8 +38,11 @@ type Running struct {
 	Operator *Operator
 	// RelayAddr is the address of the reference relay, empty without one.
 	RelayAddr string
+	// CAAddr is the address of the reference CA (Operator.CA), which serves refca.Host.
+	CAAddr string
 
-	server *http.Server
+	server   *http.Server
+	caServer *http.Server
 }
 
 // Serve starts the operator on a loopback port with a certificate for its domain, issued by a
@@ -53,36 +57,47 @@ func Serve(cfg Config) *Running {
 	}
 	caDER := must(x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey))
 	ca := must(x509.ParseCertificate(caDER))
-	leafKey := must(ecdsa.GenerateKey(elliptic.P256(), rand.Reader))
-	leafTemplate := &x509.Certificate{
-		SerialNumber: big.NewInt(2), DNSNames: []string{o.cfg.Operator},
-		NotBefore: time.Now().Add(-time.Minute), NotAfter: time.Now().Add(certLifetime),
-		KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-	}
-	leafDER := must(x509.CreateCertificate(rand.Reader, leafTemplate, ca, &leafKey.PublicKey, caKey))
-	serverTLS := &tls.Config{
-		MinVersion:   tls.VersionTLS13,
-		Certificates: []tls.Certificate{{Certificate: [][]byte{leafDER}, PrivateKey: leafKey}},
-	}
-	if cfg.Faults.Has(OnlyTLS12) {
-		serverTLS.MinVersion, serverTLS.MaxVersion = tls.VersionTLS12, tls.VersionTLS12
-	}
-	l := must(tls.Listen("tcp", "127.0.0.1:0", serverTLS))
 	roots := x509.NewCertPool()
 	roots.AddCert(ca)
+	l := must(tls.Listen("tcp", "127.0.0.1:0", serverConfig(o.cfg.Operator, ca, caKey, cfg.Faults.Has(OnlyTLS12))))
 	r := &Running{Addr: l.Addr().String(), Roots: roots, Operator: o,
 		server: &http.Server{Handler: o.Handler(), ReadHeaderTimeout: 5 * time.Second,
 			ErrorLog: log.New(io.Discard, "", 0)}}
 	go func() { _ = r.server.Serve(l) }()
+	cl := must(tls.Listen("tcp", "127.0.0.1:0", serverConfig(refca.Host, ca, caKey, false)))
+	r.CAAddr = cl.Addr().String()
+	r.caServer = &http.Server{Handler: o.acmeCA.Handler(), ReadHeaderTimeout: 5 * time.Second, ErrorLog: log.New(io.Discard, "", 0)}
+	go func() { _ = r.caServer.Serve(cl) }()
 	if cfg.Relay != nil {
 		r.RelayAddr = cfg.Relay.Start(o)
 	}
 	return r
 }
 
-// Close stops the listener.
+// serverConfig is the TLS configuration of a test server for the host, with a certificate
+// signed by the CA made for the call.
+func serverConfig(host string, ca *x509.Certificate, caKey *ecdsa.PrivateKey, onlyTLS12 bool) *tls.Config {
+	leafKey := must(ecdsa.GenerateKey(elliptic.P256(), rand.Reader))
+	leafTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(time.Now().UnixNano()), DNSNames: []string{host},
+		NotBefore: time.Now().Add(-time.Minute), NotAfter: time.Now().Add(certLifetime),
+		KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+	leafDER := must(x509.CreateCertificate(rand.Reader, leafTemplate, ca, &leafKey.PublicKey, caKey))
+	conf := &tls.Config{
+		MinVersion:   tls.VersionTLS13,
+		Certificates: []tls.Certificate{{Certificate: [][]byte{leafDER}, PrivateKey: leafKey}},
+	}
+	if onlyTLS12 {
+		conf.MinVersion, conf.MaxVersion = tls.VersionTLS12, tls.VersionTLS12
+	}
+	return conf
+}
+
+// Close stops the listeners.
 func (r *Running) Close() error {
 	err := r.server.Close()
+	_ = r.caServer.Close()
 	if r.Operator.cfg.Relay != nil {
 		r.Operator.cfg.Relay.Close()
 	}
@@ -100,6 +115,8 @@ func (r *Running) Remap(hostport string) string {
 		return r.Operator.dns.Remap(hostport)
 	case host == r.Operator.cfg.Operator:
 		return r.Addr
+	case host == refca.Host:
+		return r.CAAddr
 	case r.RelayAddr != "" && (host == "tunnel."+r.Operator.cfg.Operator || port == "443" && (host == "127.0.0.1" || host == "::1")):
 		return r.RelayAddr
 	}

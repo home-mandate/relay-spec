@@ -37,7 +37,22 @@ type Report struct {
 	Notes []string `json:"notes"`
 	// Incomplete lists why a run cannot be conformant although nothing failed.
 	Incomplete []string `json:"incomplete"`
+	// NotChecked lists the obligations that no live test checks (RELAY-v0 section 8.1), so that
+	// a conformant report claims no more than was tested.
+	NotChecked []string `json:"not_checked"`
 	Conforms   bool     `json:"conforms"`
+}
+
+// NotChecked are the obligations of an operator that the live test cannot check (RELAY-v0
+// sections 7.10 and 8.1).
+var NotChecked = []string{
+	"retention and use of the data of households (7.5)",
+	"backup keys of the relay held offline and tested (7.7)",
+	"the private key of the tunnel CA kept off the relay servers (7.7)",
+	"notifications of households (7.7, 7.9)",
+	"the reason given for a block (7.6)",
+	"the operator's own monitoring of Certificate Transparency (7.4)",
+	"the refusal of an order validated with HTTP-01 and of an order for a standard name while no account is reported for it (6.3)",
 }
 
 // ClassResult counts the checks of one conformance class. An operator conforms to the class
@@ -102,6 +117,9 @@ func Summarize(w io.Writer, r Report) {
 	}
 	for _, s := range r.Notes {
 		fmt.Fprintf(w, "note: %s\n", s)
+	}
+	for _, s := range r.NotChecked {
+		fmt.Fprintf(w, "not checked: %s\n", s)
 	}
 	fmt.Fprintf(w, "installations: %d created, %d unpaired\n", r.Installations.Created, r.Installations.Unpaired)
 	fmt.Fprintf(w, "conforms: %t\n", r.Conforms)

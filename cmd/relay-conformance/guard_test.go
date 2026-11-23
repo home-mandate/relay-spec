@@ -18,7 +18,7 @@ const modulePath = "github.com/home-mandate/relay-spec/"
 // referencePackages are the packages that hold test keys, reference operators and faults;
 // nothing the tool or the files of package relay (which are not tests) import may reach them
 // (RELAY-v0 section 8.2: test keys must not be used with a live operator).
-var referencePackages = []string{"refop", "refrelay", "refdns", "refgateway"}
+var referencePackages = []string{"refop", "refrelay", "refdns", "refgateway", "refca"}
 
 // importsOf returns every package that the non-test files of the package in dir import,
 // directly and indirectly, within this module.
@@ -53,6 +53,7 @@ func TestToolAndEmbeddedFilesNeverReachTheReferenceOperator(t *testing.T) {
 		"internal/tunnelclient": filepath.Join("..", "..", "internal", "tunnelclient"),
 		"internal/frames":       filepath.Join("..", "..", "internal", "frames"),
 		"internal/tunnelcert":   filepath.Join("..", "..", "internal", "tunnelcert"),
+		"internal/ctlog":        filepath.Join("..", "..", "internal", "ctlog"),
 	} {
 		seen := map[string]bool{}
 		importsOf(t, dir, seen)
