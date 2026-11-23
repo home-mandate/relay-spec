@@ -79,6 +79,9 @@ type Config struct {
 	// Codes are the pairing codes the test account holds, upper case without hyphens; empty
 	// means DefaultCodes.
 	Codes []string
+	// NameDomain is the name domain of the operator, served by the reference DNS; empty means
+	// DefaultNameDomain.
+	NameDomain string
 	// TesterZone is a zone of the tester, served by the reference DNS, for own-domain names;
 	// empty means DefaultTesterZone.
 	TesterZone string
@@ -121,10 +124,13 @@ func New(cfg Config) *Operator {
 	if cfg.TesterZone == "" {
 		cfg.TesterZone = DefaultTesterZone
 	}
+	if cfg.NameDomain == "" {
+		cfg.NameDomain = DefaultNameDomain
+	}
 	if cfg.DNSLag == 0 {
 		cfg.DNSLag = 500 * time.Millisecond
 	}
-	d := must(refdns.New(DefaultNameDomain, cfg.TesterZone))
+	d := must(refdns.New(cfg.NameDomain, cfg.TesterZone))
 	o := &Operator{cfg: cfg, dns: d, ca: newIssuer(cfg.Operator), nonces: map[string]bool{},
 		insts: map[string]*installation{}, codes: map[string]*codeUse{}, homeIDs: map[string]bool{}}
 	o.acmeCA = refca.New(refca.Config{DNS: caView{o}, Faults: cfg.CAFaults})
@@ -197,7 +203,7 @@ func (o *Operator) document() map[string]any {
 	must0(json.Unmarshal(example, &doc))
 	op := o.cfg.Operator
 	doc["operator_domain"] = op
-	doc["name_domain"] = DefaultNameDomain
+	doc["name_domain"] = o.cfg.NameDomain
 	doc["trust_domain"] = op
 	doc["enrollment"] = "https://" + op + "/enroll/directory"
 	doc["relay"] = map[string]any{"host": "tunnel." + op, "port": 8443}

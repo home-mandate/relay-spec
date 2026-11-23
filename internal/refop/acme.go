@@ -75,7 +75,7 @@ func hasDuplicate(values []string) bool {
 // forbidden reports whether an own-domain name may not be registered: the name domain, the
 // operator domain, the trust domain, the host of the relay and names below them.
 func (o *Operator) forbidden(name string) bool {
-	for _, d := range []string{DefaultNameDomain, o.cfg.Operator, "tunnel." + o.cfg.Operator} {
+	for _, d := range []string{o.cfg.NameDomain, o.cfg.Operator, "tunnel." + o.cfg.Operator} {
 		if name == d || strings.HasSuffix(name, "."+d) {
 			return !(o.cfg.Faults.Has(OwnNameUnderOperator) && d == o.cfg.Operator)
 		}

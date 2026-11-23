@@ -59,7 +59,7 @@ func (o *Operator) installationURL(inst *installation) string {
 	return o.base() + instPath + inst.id
 }
 
-func (o *Operator) stdName(inst *installation) string { return inst.homeID + "." + DefaultNameDomain }
+func (o *Operator) stdName(inst *installation) string { return inst.homeID + "." + o.cfg.NameDomain }
 
 func randomLabel(n int) string {
 	raw := make([]byte, n)
