@@ -133,9 +133,15 @@ func TestFlagsReachTheSettings(t *testing.T) {
 		s.StatePath != "s.json" || s.Timeout != 10*time.Minute || s.Version == "" {
 		t.Errorf("settings %+v", s)
 	}
-	call(t, f, nil, "-operator", "op.example.net", "-own-domain", "x.test.example", "-dns-hook", "./hook")
-	if f.settings.DNSHook != "./hook" {
+	if s.ACMEProduction {
+		t.Error("the production environment of the CA without -acme-production")
+	}
+	call(t, f, nil, "-operator", "op.example.net", "-own-domain", "x.test.example", "-dns-hook", "./hook", "-acme-production")
+	if f.settings.DNSHook != "./hook" || !f.settings.ACMEProduction {
 		t.Errorf("settings %+v", f.settings)
+	}
+	if code, _, _ := call(t, f, nil, "-cleanup", "s.json", "-acme-production"); code != liveconf.ExitUsage {
+		t.Errorf("a clean-up with -acme-production: exit %d", code)
 	}
 }
 

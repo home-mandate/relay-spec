@@ -10,10 +10,13 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/home-mandate/relay-spec/internal/refca"
 )
 
-// ACMECAs are the acme_cas of the reference operator.
-var ACMECAs = []string{"letsencrypt.org"}
+// ACMECAs are the acme_cas of the reference operator: a CA of cas.md, whose prefix the
+// accounts that belong to nobody take, and the reference CA, which the class issuance uses.
+var ACMECAs = []string{"letsencrypt.org", refca.Identity}
 
 const maxOwnName = 233
 

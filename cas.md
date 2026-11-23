@@ -23,6 +23,18 @@ The account URI prefix is the form of the URI of an ACME account at that CA (RFC
 7.3); the test tool of RELAY-v0 Section 8.3 uses it, with a number that no account has, to report
 an account that belongs to nobody.
 
+The class `issuance` of the test tool (RELAY-v0 Section 8.3) creates real accounts and orders
+certificates. It uses the CA's test environment unless it is asked for the production
+environment, and needs both ACME endpoints:
+
+| CA | Environment | ACME directory | Account URI prefix |
+|---|---|---|---|
+| Let's Encrypt | production | `https://acme-v02.api.letsencrypt.org/directory` | `https://acme-v02.api.letsencrypt.org/acme/acct/` |
+| Let's Encrypt | test ([staging](https://letsencrypt.org/docs/staging-environment/)) | `https://acme-staging-v02.api.letsencrypt.org/directory` | `https://acme-staging-v02.api.letsencrypt.org/acme/acct/` |
+
+The test environment enforces CAA as production does, but its certificates go to test logs that
+no public log list contains, so the tool checks Certificate Transparency only in production.
+
 To propose a CA, open an issue with public sources for both conditions. A CA is removed when a
 source shows that it no longer meets one of them; operators then remove it from `acme_cas`, and
 gateways move to another CA in `acme_cas` as RELAY-v0 Section 6.6 describes.

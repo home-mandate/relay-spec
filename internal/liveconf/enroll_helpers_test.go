@@ -56,10 +56,12 @@ func hookFor(t *testing.T, r *refop.Running) string {
 
 func newStatePath(t *testing.T) string { return filepath.Join(t.TempDir(), "state.json") }
 
-// enrollSettings are the settings of a run of the classes enrollment and dns.
+// enrollSettings are the settings of a run of the classes against the reference, with the
+// production environment of the reference CA.
 func enrollSettings(t *testing.T, r *refop.Running, classes ...string) Settings {
 	return Settings{
 		Operator: refop.DefaultOperator, Classes: classes, Codes: refop.DefaultCodes,
 		OwnDomain: testOwnDomain, DNSHook: hookFor(t, r), StatePath: newStatePath(t), Version: "test",
+		ACMEProduction: true,
 	}
 }

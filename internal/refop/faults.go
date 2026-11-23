@@ -89,3 +89,12 @@ const ApexCNAME Fault = 1 << 41
 
 // OnlyTLS12 (M9) offers only TLS 1.2 on the operator's HTTPS port (RELAY-v0 sections 3 and 5).
 const OnlyTLS12 Fault = 1 << 42
+
+// Defects of the DNS as the reference CA sees it (RELAY-v0 sections 6.2 and 8.3): the operator
+// answers the CA otherwise than it answers everyone else, which only the class issuance shows.
+const (
+	// CASeesOtherCAA (D11) shows the CA a CAA record of a standard name without accounturi.
+	CASeesOtherCAA Fault = 1 << (iota + 43)
+	// CASeesNoChallenge (D12) hides the challenge records from the CA.
+	CASeesNoChallenge
+)

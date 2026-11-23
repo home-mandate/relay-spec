@@ -90,6 +90,16 @@ const (
 	CheckRelayDenylist = "relay.denylist"
 )
 
+// Check IDs of the class issuance.
+const (
+	CheckIssuanceIssue     = "issuance.issue"
+	CheckIssuanceForeign   = "issuance.refuse-account"
+	CheckIssuanceWildcard  = "issuance.refuse-wildcard"
+	CheckIssuanceSCT       = "issuance.sct"
+	CheckIssuanceInclusion = "issuance.ct-inclusion"
+	CheckIssuanceSnapshot  = "issuance.ct-snapshot"
+)
+
 // checks is the table of all checks of this version.
 var checks = []Check{
 	{CheckMetadataFetch, ClassMetadata, "3", "the document is served over HTTPS with TLS 1.3 and a valid certificate, without a redirect"},
@@ -154,6 +164,13 @@ var checks = []Check{
 	{CheckRelayProxy, ClassRelay, "4.6", "the PROXY header has the form of section 4.6, and the relay does not take it from the agent"},
 	{CheckRelayStream, ClassRelay, "4.5", "the bytes of an agent pass unchanged, and the end of each direction is passed on"},
 	{CheckRelayDenylist, ClassRelay, "4.1", "the certificate of an unpaired installation is refused, and its connections are closed within 60 seconds of unpairing"},
+
+	{CheckIssuanceIssue, ClassIssuance, "5.6, 6.3", "a CA of acme_cas issues a certificate for a standard name to the reported account through the operator's challenge records"},
+	{CheckIssuanceForeign, ClassIssuance, "6.3, 6.6", "the CA refuses an order of an account that was not reported (caa)"},
+	{CheckIssuanceWildcard, ClassIssuance, "6.3, 6.6", "the CA refuses an order for the wildcard name of the standard name (caa)"},
+	{CheckIssuanceSCT, ClassIssuance, "6.6", "the certificate carries valid SCTs of logs of at least two operators of the log list"},
+	{CheckIssuanceInclusion, ClassIssuance, "6.6", "the logs of the SCTs include the certificate within their maximum merge delay (-ct-verify)"},
+	{CheckIssuanceSnapshot, ClassIssuance, "6.7", "Certificate Transparency shows no other certificate for the standard name since the pairing (-ct-verify)"},
 }
 
 // Checks returns the table of checks in the order of a run.

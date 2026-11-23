@@ -12,16 +12,21 @@ import (
 const unlistedCA = "unlisted-ca.example"
 
 // acme reports ACME accounts that belong to nobody (RELAY-v0 section 8.3), so that the CAA
-// record of the test permits nobody and no server certificate can be obtained, and publishes
-// challenge values.
+// record of the test permits nobody, and publishes challenge values. The second installation
+// gets a real account instead when the class issuance is selected; it then obtains a
+// certificate for its standard name.
 func (s *script) acme(ctx context.Context) error {
-	if !s.wantEnroll() && !s.wantDNS() {
+	if !s.wantEnroll() && !s.wantDNS() && !s.wantIssuance() {
 		return nil
 	}
 	a, b := s.insts[0], s.insts[1]
 	account, caaID, ok := accountURI(s.doc.ACMECAs)
 	if !ok {
 		s.r.incomplete("acme_cas lists no CA of cas.md, so the ACME checks were not made")
+		if b != nil && s.wantIssuance() {
+			_, err := s.issuance(ctx, b)
+			return err
+		}
 		return nil
 	}
 	s.account, s.caaID = account, caaID
@@ -40,15 +45,31 @@ func (s *script) acme(ctx context.Context) error {
 	if b == nil {
 		return nil
 	}
-	accountB, _, _ := accountURI(s.doc.ACMECAs)
-	if _, err := s.c.ReportACME(ctx, b.id, accountB, caaID); isFatal(err) {
-		return err
+	return s.acmeSecond(ctx, b, caaID)
+}
+
+// acmeSecond gives the second installation an account, a real one for the class issuance,
+// and checks that a CA outside acme_cas is refused.
+func (s *script) acmeSecond(ctx context.Context, b *liveInst, caaID string) error {
+	reported := false
+	if s.wantIssuance() {
+		var err error
+		if reported, err = s.issuance(ctx, b); err != nil {
+			return err
+		}
 	}
-	if _, err := s.c.Challenge(ctx, b.id, b.paired.Installation.ACMEChallenge, []string{enroll.RandomToken(32)}); isFatal(err) {
-		return err
+	if !reported {
+		accountB, _, _ := accountURI(s.doc.ACMECAs)
+		if _, err := s.c.ReportACME(ctx, b.id, accountB, caaID); isFatal(err) {
+			return err
+		}
+		if _, err := s.c.Challenge(ctx, b.id, b.paired.Installation.ACMEChallenge, []string{enroll.RandomToken(32)}); isFatal(err) {
+			return err
+		}
 	}
-	_, err = s.c.ReportACME(ctx, b.id, accountB, unlistedCA)
-	problem, fatal = expectError(err, "malformed")
+	other, _, _ := accountURI(s.doc.ACMECAs)
+	_, err := s.c.ReportACME(ctx, b.id, other, unlistedCA)
+	problem, fatal := expectError(err, "malformed")
 	if fatal != nil {
 		return fatal
 	}

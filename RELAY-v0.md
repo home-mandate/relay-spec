@@ -1471,7 +1471,7 @@ operator, and a household should know the difference:
 |---|---|
 | separate domains and hosts (7.1), DNSSEC, addresses, CAA and TTL (6.3) | what it monitors (7.4) |
 | both protection levels in the metadata; an own-domain name can be registered (7.3) | data, their periods and their use (7.5) |
-| publicly logged certificates for a name (7.2) | access to the relay's bytes (7.2), offline keys and tests (7.7) |
+| publicly logged certificates for a name (7.2); that a CA of `acme_cas` sees the CAA records of a standard name as everyone else does, enforces them and logs what it issues (6.3, 6.6) | access to the relay's bytes (7.2), offline keys and tests (7.7) |
 | behaviour of the enrollment endpoint (5) | reasons for a block (7.6), notifications (7.7, 7.9) |
 
 ## 8. Conformance
@@ -1490,15 +1490,28 @@ this version defines the classes of operators and, in Section 8.5, lists cases f
 | `enrollment` | directory, nonces, requests with their errors and the order of their checks, pairing, the installation, tunnel certificates, ACME support, the registration and verification of an own-domain name, and unpairing | 5, 6.4 |
 | `dns` | the records of the name domain and of a standard name: CAA at the apex and at the name, A and AAAA, challenge records, TTL, and their removal on unpairing | 5.6, 5.7, 6.3 |
 | `relay` | the tunnel: TLS parameters, frames, the control connection, tokens and data connections, routing of an agent connection by its standard name and by a verified own-domain name, the PROXY header, `pins`, the pinned keys of the relay, and the denylist after unpairing | 4, 6.1, 6.8 |
+| `issuance` | a certificate for a standard name from a CA of `acme_cas` through the operator's challenge records, the refusals that the CAA records demand of that CA, the SCTs of the certificate, its inclusion in the logs, and no other certificate for the name in Certificate Transparency | 5.6, 6.3, 6.6, 6.7 |
 
-An operator **conforms** to this version if it passes all four classes. A claim of conformance
+An operator **conforms** to this version if it passes all five classes. A claim of conformance
 names the version (the tag of the repository of this specification), the operator domain, the
 classes, the manifest of the cases (`conformance/manifest.json`, by its SHA-256) and the date
 of the test. The report of the test tool contains all of these and can be published. A test shows
 the state of the operator at that date; Section 8.4 lets it be repeated at any time.
 
-What only the operator can state, such as the data it keeps, its offline keys and its
-notifications, is not part of a class (Section 7.10).
+What no live test can check is not part of a class (Section 7.10). The report of the test tool
+lists it, so that a claim of conformance claims no more than was tested:
+
+- the retention and use of the data of households (Section 7.5);
+- backup keys of the relay held offline and tested (Section 7.7);
+- the private key of the tunnel CA kept off the servers that relay connections (Section 7.7);
+- the notifications of households (Sections 7.7, 7.9);
+- the reason given for a block (Section 7.6);
+- the operator's own monitoring of Certificate Transparency (Section 7.4);
+- that a CA refuses an order validated with HTTP-01, and an order for a standard name while no
+  account is reported for it (`issue ";"`, Section 6.3): a CA checks the CAA records only after a
+  successful validation, which the test cannot complete for these orders (the relay passes no
+  HTTP, and the operator publishes no challenge values without an account), so their refusal
+  does not show its reason.
 
 ### 8.2 Cases
 
@@ -1536,22 +1549,54 @@ compares the errors, also requests of one installation at the URLs of another, c
 certificates it is issued and the records in the operator's DNS, registers an own-domain name in a
 zone of the tester, opens the tunnel with the parameters of the cases, sends frames with their
 defects and presents tokens that the relay must refuse, connects as an agent to the standard name
-and to the own-domain name, and finally unpairs and checks that the installation, its certificates
-and its records are gone. It reports an ACME account URI at a CA of `acme_cas` that belongs to no
-account, so the CAA record of the test permits nobody and the test obtains no server certificate;
-the URI has the form of an account URI of that CA (the prefix in `cas.md`) followed by a number
-far above every number the CA has assigned, and the operator need not check at the CA whether the
-account exists. It
-honours `Retry-After` and spaces its attempts, so that the limits of an operator do not fail it. A
-run creates at most two installations and unpairs every one it created before it ends, also when a
+and to the own-domain name, obtains a server certificate for the standard name of the second
+installation and orders certificates that the CA must refuse, and finally unpairs and checks that
+the installation, its certificates and its records are gone. For the first installation it
+reports an ACME account URI at a CA of `acme_cas` that belongs to no account, so that its CAA
+record permits nobody; the URI has the form of an account URI of that CA (the prefix in `cas.md`)
+followed by a number far above every number the CA has assigned, and the operator need not check
+at the CA whether the account exists.
+
+For the class `issuance` the tool plays the gateway of the second installation towards a CA of
+`acme_cas` for which `cas.md` names the ACME endpoints. It creates an account at that CA, which
+agrees to the CA's terms of service, reports it (Section 5.6), and obtains a certificate for the
+standard name with DNS-01 through the operator's challenge records, which it first sees served by
+the name servers of the name domain. With the same account it then orders a certificate for the
+wildcard name below the standard name, and with a second account, which it never reports, one for
+the standard name. The CA must refuse both because of the CAA records (`issuewild ";"` and
+`accounturi`, Section 6.3); only a refusal for the CAA records counts, and a refusal for another
+reason decides nothing, because a CA checks the CAA records only after a successful validation.
+A run uses at most two accounts and three orders, and deactivates the accounts before it ends.
+This is what an operator that answers a CA otherwise than everyone else (Section 6.2) cannot hide
+from the test: the checks of the class `dns` read the records as gateways do, these orders show
+what the CA sees.
+
+By default the tool uses the test environment of the CA, which enforces the CAA records as
+production does and uses up none of the operator's limits (Section 7.8). Its certificates go to
+test logs that no public log list contains, so Certificate Transparency is checked only in the
+production environment (`-acme-production`), in which the run obtains one real certificate for the
+standard name. There the tool checks that the certificate carries valid SCTs of logs of at least
+two operators of the log list that Google publishes, after verifying the signature of the list
+with Google's key. Called again with `-ct-verify` and the state file of the run, once the maximum
+merge delay of these logs has passed, it fetches inclusion proofs directly from the logs, without a
+monitoring service in between, and checks through two sources of `ct-sources.md` of the
+Home-Mandate Specification that Certificate Transparency shows no other certificate for the
+standard name since the pairing. The test shows a correct setup at one time; it cannot rule out an
+operator that deceives on purpose later, which the monitoring of the gateway covers (Section 6.7).
+
+The tool honours `Retry-After` and spaces its attempts, so that the limits of an operator do not
+fail it. A run creates at most two installations and unpairs every one it created before it ends, also when a
 check fails.
 
-An operator is **conformant** in the report only if the tool ran all four classes with two pairing
-codes and an own domain; a run with fewer codes, without an own domain, with fewer classes, or in
-which the operator could not be reached or limited the rate is incomplete and says so, never
-conformant. The same holds when `acme_cas` lists no CA of `cas.md`, because the tool then
-cannot form an account URI and leaves out the checks of ACME accounts and challenges, and whenever
-a check is skipped without an earlier failure. The cases `blocked` and `offline-too-long` and a pairing code for an existing installation (a replacement code) are checked
+An operator is **conformant** in the report only if the tool ran all five classes with two pairing
+codes and an own domain, the class `issuance` in the production environment of a CA, and the
+run was completed with `-ct-verify`; a run with fewer codes, without an own domain, with fewer
+classes, against the test environment of a CA, without `-ct-verify`, or in which the operator or
+the CA could not be reached or limited the rate is incomplete and says so, never conformant. The
+same holds when `acme_cas` lists no CA of `cas.md`, because the tool then cannot form an account
+URI, leaves out the checks of ACME accounts and challenges and has no CA for the class
+`issuance`, when the CA refuses an order for a reason that decides nothing, and whenever a check
+is skipped without an earlier failure. The cases `blocked` and `offline-too-long` and a pairing code for an existing installation (a replacement code) are checked
 offline only, because a live test cannot make an operator block its test account or wait for days. DNSSEC
 and IPv6 are hints in the report and decide nothing. The tool checks the source of a PROXY header
 only for its form and for being a public address, because it cannot know the address of the
@@ -1569,7 +1614,9 @@ An operator that claims conformance MUST, for as long as it claims it,
 - handle the installations of the test account like any other: the same metadata, endpoints,
   relay, CAs, name domain and limits, without telling tests apart from real use;
 - allow test runs as in Section 8.3 at least once a month, and after a failed run one more run
-  within that month.
+  within that month. A run in the production environment of a CA obtains one certificate for a
+  standard name of the test account, which counts against the limits of the CA (Section 7.8) like
+  any other.
 
 A block of the test account or of one of its installations, or a refused run within that rate, ends the claim of conformance until
 a run passes.
@@ -1747,6 +1794,19 @@ the household as the sections say:
 
 ### Unreleased
 
+- Section 8: a fifth class `issuance` checks what an operator claims with `acme_cas` and its CAA
+  records. The test tool, as the gateway of the second installation, obtains a certificate for
+  its standard name from a CA of `acme_cas` through the operator's challenge records, and orders
+  a certificate for the wildcard name and one with an account it never reported, which the CA
+  must refuse for the CAA records; only this shows whether a CA sees the records that gateways see.
+  It uses the CA's test environment by default; Certificate Transparency (SCTs of logs of at least
+  two operators of Google's signed log list, inclusion proofs from the logs with `-ct-verify`, and
+  no other certificate for the name since the pairing) is checked only in production, and a run
+  is conformant only with the production environment and `-ct-verify`. Section 8.1 lists what no
+  live test can check, and the report lists it as well; refusals of HTTP-01 and of a name without
+  an account are among them. Section 8.4: a run in production obtains one real certificate.
+  `cas.md` names the ACME directories and the account URI prefix of the test environment. Gateways
+  are not affected; Section 12: none of this triggers an event.
 - Normative change, Sections 3 and 6.4: before its `from`, an operator MAY withdraw a planned set
   of relay addresses or move its `from` later, never earlier; a set with other addresses is a new
   set with its own 30 days, and a withdrawal ends the duty to accept agent connections at the
@@ -1852,7 +1912,7 @@ the household as the sections say:
   MUST NOT use a token again.
 - Section 8.1, 8.3 and Section 3: `metadata` also covers Sections 7.1 and 7.3, and `relay` Section
   6.8; the test tool is in `cmd/`, it is conformant only with two pairing codes, an own domain
-  and all four classes, `blocked`, `offline-too-long` and replacement codes are checked offline
+  and all classes, `blocked`, `offline-too-long` and replacement codes are checked offline
   only, DNSSEC and IPv6 are hints; `relay_addresses` MUST be globally reachable unicast addresses.
 - Section 6.4: registering a name that is registered already makes the operator look up the TXT
   record again, so that a household does not wait a day for the first verification. Section 8.2:

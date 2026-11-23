@@ -7,7 +7,7 @@
 //	relay-reference -report <file>
 //
 // A release attaches this report: it shows that the reference code of the release conforms to
-// all four classes. The command reaches nothing but its own reference: it takes no operator, no
+// all five classes. The command reaches nothing but its own reference: it takes no operator, no
 // pairing codes and no DNS hook, so the loopback addresses and the short time values it allows
 // can never be used against a real operator. relay-conformance itself never allows them.
 package main
@@ -25,8 +25,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/home-mandate/relay-spec/internal/ctlog"
 	"github.com/home-mandate/relay-spec/internal/liveconf"
 	"github.com/home-mandate/relay-spec/internal/netguard"
+	"github.com/home-mandate/relay-spec/internal/refca"
 	"github.com/home-mandate/relay-spec/internal/refop"
 	"github.com/home-mandate/relay-spec/internal/refrelay"
 )
@@ -103,7 +105,9 @@ func runAgainstReference(ctx context.Context, self, statePath string) liveconf.R
 			Cleanup: 5 * time.Second, RetryBudget: 300 * time.Millisecond, RetryUnit: 10 * time.Millisecond,
 			Tunnel: 3 * time.Second, Close: 2 * time.Second, Slack: 150 * time.Millisecond, ControlWindow: 120 * time.Millisecond, Deny: 600 * time.Millisecond,
 		},
-		Unpair: liveconf.UnpairInstallation,
+		Unpair:  liveconf.UnpairInstallation,
+		CAs:     []liveconf.CA{{Identity: refca.Identity, Production: caEndpoint(r), Staging: caEndpoint(r)}},
+		LogList: func(context.Context) (*ctlog.List, error) { return r.Operator.CA().LogList(), nil },
 	}
 	s := liveconf.Settings{
 		Operator:  refop.DefaultOperator,
@@ -112,8 +116,15 @@ func runAgainstReference(ctx context.Context, self, statePath string) liveconf.R
 		DNSHook:   self + " " + hookCommand + " " + base,
 		StatePath: statePath,
 		Version:   version,
+		// The reference CA plays the production environment of a CA, with its own logs.
+		ACMEProduction: true,
 	}
 	return liveconf.RunWith(ctx, s, env)
+}
+
+// caEndpoint is the ACME endpoint of the reference CA of the operator.
+func caEndpoint(r *refop.Running) liveconf.Endpoint {
+	return liveconf.Endpoint{Directory: r.Operator.CA().Directory(), AccountPrefix: r.Operator.CA().AccountPrefix()}
 }
 
 // dnsHook sets or removes the challenge TXT record in the reference DNS through its control

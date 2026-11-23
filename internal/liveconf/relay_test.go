@@ -3,6 +3,7 @@
 package liveconf
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -23,7 +24,7 @@ func serveRelay(t *testing.T, cfg refop.Config, faults refrelay.Fault) (*refop.R
 	return r, env
 }
 
-// runRelayClass runs all four classes against the reference operator and relay.
+// runAll runs the classes (all five without any) against the reference operator and relay.
 func runAll(t *testing.T, cfg refop.Config, faults refrelay.Fault, classes ...string) Result {
 	t.Helper()
 	r, env := serveRelay(t, cfg, faults)
@@ -35,15 +36,31 @@ func runAll(t *testing.T, cfg refop.Config, faults refrelay.Fault, classes ...st
 	return RunWith(ctx(t), set, env)
 }
 
-func TestTheCleanReferenceConforms(t *testing.T) {
-	res := runAll(t, refop.Config{}, 0)
-	if res.Exit != ExitConforms || !res.Report.Conforms || len(res.Report.Failures) != 0 {
-		t.Fatalf("exit %d, failures %+v, incomplete %v, classes %+v", res.Exit, res.Report.Failures, res.Report.Incomplete, res.Report.Classes)
+// waitsOnlyForCTVerify reports whether a run passed every check it made and lacks only the
+// checks of -ct-verify, which this version of the tool does not have yet: then it is
+// incomplete for that reason alone (the next version makes the clean reference conformant).
+func waitsOnlyForCTVerify(res Result) bool {
+	want := []string{reasonCTVerify, fmt.Sprintf("class %s skipped 2 checks", ClassIssuance)}
+	if res.Exit != ExitIncomplete || len(res.Report.Failures) != 0 || !slices.Equal(res.Report.Incomplete, want) {
+		return false
 	}
 	for _, class := range AllClasses {
-		if c := res.Report.Classes[class]; !c.Conforms || c.Skipped != 0 {
-			t.Errorf("%s: %+v", class, c)
+		c := res.Report.Classes[class]
+		skipped := 0
+		if class == ClassIssuance {
+			skipped = 2
 		}
+		if c.NotRun || c.Failed != 0 || c.Skipped != skipped || c.Conforms != (skipped == 0) {
+			return false
+		}
+	}
+	return true
+}
+
+func TestTheCleanReferenceConforms(t *testing.T) {
+	res := runAll(t, refop.Config{}, 0)
+	if !waitsOnlyForCTVerify(res) {
+		t.Fatalf("exit %d, failures %+v, incomplete %v, classes %+v", res.Exit, res.Report.Failures, res.Report.Incomplete, res.Report.Classes)
 	}
 	if got := res.Report.Installations; got.Created != 2 || got.Unpaired != 2 {
 		t.Errorf("installations %+v", got)

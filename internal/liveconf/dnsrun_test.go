@@ -167,18 +167,10 @@ func TestTestKeyThumbprintsAreTheKeysOfTheFile(t *testing.T) {
 	}
 }
 
-func TestAccountPrefixesAreTheOnesOfTheCAList(t *testing.T) {
-	cas, err := os.ReadFile("../../cas.md")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for caa, prefix := range accountPrefixes {
-		if !strings.Contains(string(cas), "`"+caa+"`") || !strings.Contains(string(cas), "`"+prefix+"`") {
-			t.Errorf("cas.md does not list %s with the prefix %s", caa, prefix)
-		}
-	}
+func TestAccountURIsOfNobodyHaveThePrefixOfTheCAList(t *testing.T) {
+	prefix := DefaultCAs[0].Production.AccountPrefix
 	account, caa, ok := accountURI([]string{"unknown.example", "letsencrypt.org"})
-	if !ok || caa != "letsencrypt.org" || !strings.HasPrefix(account, accountPrefixes[caa]) || len(account) != len(accountPrefixes[caa])+18 {
+	if !ok || caa != "letsencrypt.org" || !strings.HasPrefix(account, prefix) || len(account) != len(prefix)+18 {
 		t.Errorf("accountURI: %q %q %v", account, caa, ok)
 	}
 	if _, _, ok := accountURI([]string{"unknown.example"}); ok {

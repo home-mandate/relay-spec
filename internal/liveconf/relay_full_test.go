@@ -34,19 +34,14 @@ func noInstallationIsLeft(t *testing.T, r *refop.Running) {
 	}
 }
 
-// TestReferenceConforms: the clean reference passes all four classes with two codes and an own
-// domain, creates two installations and unpairs both.
+// TestReferenceConforms: the clean reference passes every check of the five classes that this
+// version makes, with two codes and an own domain, creates two installations and unpairs both.
 func TestReferenceConforms(t *testing.T) {
 	r, env := serveFull(t, 0)
 	s := enrollSettings(t, r)
 	res := RunWith(ctx(t), s, env)
-	if res.Exit != ExitConforms || !res.Report.Conforms || len(res.Report.Failures) != 0 || len(res.Report.Incomplete) != 0 {
+	if !waitsOnlyForCTVerify(res) {
 		t.Fatalf("exit %d (%s), failures %+v, incomplete %v", res.Exit, res.Message, res.Report.Failures, res.Report.Incomplete)
-	}
-	for _, class := range AllClasses {
-		if c := res.Report.Classes[class]; !c.Conforms || c.Skipped != 0 || c.Failed != 0 || c.Cases == 0 {
-			t.Errorf("%s: %+v", class, c)
-		}
 	}
 	if res.Report.Installations != (Installations{Created: 2, Unpaired: 2}) {
 		t.Errorf("installations %+v", res.Report.Installations)

@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/home-mandate/relay-spec"
+	"github.com/home-mandate/relay-spec/internal/refca"
 	"github.com/home-mandate/relay-spec/internal/refdns"
 	"github.com/home-mandate/relay-spec/internal/refrelay"
 )
@@ -90,13 +91,16 @@ type Config struct {
 	// DNSLag is how long the second name server lags behind with ChallengeBeforeSecondServer;
 	// zero means 500 ms.
 	DNSLag time.Duration
+	// CAFaults are the defects of the reference CA that serves the class issuance.
+	CAFaults refca.Fault
 }
 
 // Operator is a reference operator.
 type Operator struct {
-	cfg Config
-	dns *refdns.DNS
-	ca  *issuer
+	cfg    Config
+	dns    *refdns.DNS
+	ca     *issuer
+	acmeCA *refca.CA
 
 	mu       sync.Mutex
 	nonces   map[string]bool
@@ -123,9 +127,13 @@ func New(cfg Config) *Operator {
 	d := must(refdns.New(DefaultNameDomain, cfg.TesterZone))
 	o := &Operator{cfg: cfg, dns: d, ca: newIssuer(cfg.Operator), nonces: map[string]bool{},
 		insts: map[string]*installation{}, codes: map[string]*codeUse{}, homeIDs: map[string]bool{}}
+	o.acmeCA = refca.New(refca.Config{DNS: caView{o}, Faults: cfg.CAFaults})
 	o.publishApex()
 	return o
 }
+
+// CA returns the reference CA, which looks up records in the DNS of the operator.
+func (o *Operator) CA() *refca.CA { return o.acmeCA }
 
 // Close stops the DNS of the operator.
 func (o *Operator) Close() { o.dns.Close() }
@@ -194,6 +202,7 @@ func (o *Operator) document() map[string]any {
 	doc["enrollment"] = "https://" + op + "/enroll/directory"
 	doc["relay"] = map[string]any{"host": "tunnel." + op, "port": 8443}
 	doc["relay_addresses"] = []string{"127.0.0.1", "::1"}
+	doc["acme_cas"] = ACMECAs
 	doc["portal"] = "https://" + op + "/"
 	doc["privacy_policy"] = "https://" + op + "/privacy"
 	f := o.cfg.Faults
