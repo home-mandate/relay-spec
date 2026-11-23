@@ -34,6 +34,8 @@ type Running struct {
 	Addr string
 	// Roots holds the CA that signed the certificate of the operator domain.
 	Roots *x509.CertPool
+	// RootCA is that CA, for a pool that holds other roots as well.
+	RootCA *x509.Certificate
 	// Operator is the operator behind the listener.
 	Operator *Operator
 	// RelayAddr is the address of the reference relay, empty without one.
@@ -60,7 +62,7 @@ func Serve(cfg Config) *Running {
 	roots := x509.NewCertPool()
 	roots.AddCert(ca)
 	l := must(tls.Listen("tcp", "127.0.0.1:0", serverConfig(o.cfg.Operator, ca, caKey, cfg.Faults.Has(OnlyTLS12))))
-	r := &Running{Addr: l.Addr().String(), Roots: roots, Operator: o,
+	r := &Running{Addr: l.Addr().String(), Roots: roots, RootCA: ca, Operator: o,
 		server: &http.Server{Handler: o.Handler(), ReadHeaderTimeout: 5 * time.Second,
 			ErrorLog: log.New(io.Discard, "", 0)}}
 	go func() { _ = r.server.Serve(l) }()

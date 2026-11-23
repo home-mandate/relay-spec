@@ -111,3 +111,22 @@ func TestMustPanicsOnAnError(t *testing.T) {
 	}()
 	must0(http.ErrServerClosed)
 }
+
+// TestANameDomainOfItsOwn: the metadata name the configured name domain, the DNS serves it and
+// the reference CA is there.
+func TestANameDomainOfItsOwn(t *testing.T) {
+	o := New(Config{NameDomain: "homes.relay-test.example.com", TesterZone: "tester.relay-test.example.com"})
+	defer o.Close()
+	rec := httptest.NewRecorder()
+	o.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, MetadataPath, nil))
+	var doc map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc["name_domain"] != "homes.relay-test.example.com" {
+		t.Errorf("name_domain %v", doc["name_domain"])
+	}
+	if o.CA() == nil || o.DNS() == nil {
+		t.Error("no reference CA or DNS")
+	}
+}

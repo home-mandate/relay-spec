@@ -31,7 +31,7 @@ func (o *Operator) ttl(normal uint32) uint32 {
 
 // publishApex publishes the CAA records at the apex of the name domain (section 6.3).
 func (o *Operator) publishApex() {
-	apex := DefaultNameDomain
+	apex := o.cfg.NameDomain
 	issue := ";"
 	if o.cfg.Faults.Has(ApexIssueCA) {
 		issue = "ca.example"
