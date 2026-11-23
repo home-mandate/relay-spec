@@ -58,6 +58,37 @@ func TestTheCleanReferencePassesIssuance(t *testing.T) {
 	}
 }
 
+// TestACAThatKeepsTheChallengeStillJudgesBothRefusals: a CA whose resolver keeps the TXT
+// records of the challenge for their TTL (60 seconds at the reference, a second being TTLUnit)
+// must not see the value of an earlier order when it validates the refusals.
+func TestACAThatKeepsTheChallengeStillJudgesBothRefusals(t *testing.T) {
+	r, env := serve(t, refop.Config{CATXTCache: 60 * testTiming().TTLUnit})
+	s := enrollSettings(t, r, ClassIssuance)
+	res := RunWith(ctx(t), s, env)
+	c := issuanceResult(t, res)
+	if len(res.Report.Failures) != 0 || c.Passed != 4 || c.Skipped != 2 {
+		t.Fatalf("failures %+v, issuance %+v, incomplete %v", res.Report.Failures, c, res.Report.Incomplete)
+	}
+}
+
+// TestALongChallengeTTLLeavesTheRefusalsUnjudged: the tool waits out the TTL of the challenge
+// records for at most ten minutes; with a longer TTL it orders no refusal and says why.
+func TestALongChallengeTTLLeavesTheRefusalsUnjudged(t *testing.T) {
+	r, env := serve(t, refop.Config{ChallengeTTL: maxCacheWait + 1})
+	s := enrollSettings(t, r, ClassIssuance)
+	res := RunWith(ctx(t), s, env)
+	c := issuanceResult(t, res)
+	if len(res.Report.Failures) != 0 || c.Passed != 2 || c.Skipped != 4 {
+		t.Fatalf("failures %+v, issuance %+v, incomplete %v", res.Report.Failures, c, res.Report.Incomplete)
+	}
+	if !slices.ContainsFunc(res.Report.Incomplete, func(s string) bool { return strings.Contains(s, "TTL of 601 seconds") }) {
+		t.Errorf("incomplete %v", res.Report.Incomplete)
+	}
+	if ca := r.Operator.CA(); ca.Accounts() != 1 || len(ca.Issued()) != 1 {
+		t.Errorf("%d accounts, %d certificates", ca.Accounts(), len(ca.Issued()))
+	}
+}
+
 // TestStagingChecksNoCertificateTransparency: a run against the test environment of the CA
 // checks issuance and refusals, and says that CT needs the production environment.
 func TestStagingChecksNoCertificateTransparency(t *testing.T) {

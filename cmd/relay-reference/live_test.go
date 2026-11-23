@@ -49,7 +49,7 @@ func soaOf(addr, name string) (dnsmessage.RCode, bool) {
 }
 
 // backToReference puts the reference CA, its logs and sources back into a live environment, so
-// that the test reaches no real CA; it also records the address of the public DNS and what it
+// that the test reaches no real CA, and makes the second of a TTL short; it also records the address of the public DNS and what it
 // answers during the run.
 func backToReference(t *testing.T, listen *string, seen *[]string) func(*liveconf.Env, *refop.Running, string) {
 	return func(env *liveconf.Env, r *refop.Running, addr string) {
@@ -57,6 +57,10 @@ func backToReference(t *testing.T, listen *string, seen *[]string) func(*livecon
 		if len(env.CAs) != 1 || env.CAs[0].Identity != "letsencrypt.org" || env.LogList != nil || env.Sources != liveconf.DefaultSources {
 			t.Errorf("a live run does not use Let's Encrypt, the list of Google and the sources: %+v", env.CAs)
 		}
+		if env.Timing.TTLUnit != time.Second {
+			t.Errorf("a live run waits out a TTL in units of %v", env.Timing.TTLUnit)
+		}
+		env.Timing.TTLUnit = time.Millisecond
 		// A live run resolves names outside the reference, such as those of the CA, the logs and
 		// the sources, with the system resolver; "localhost" stands for them here.
 		if _, err := env.Net.Lookup(context.Background(), "localhost"); err != nil {

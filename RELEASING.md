@@ -67,13 +67,15 @@ The text of the release is generated and can be edited afterwards.
 ## Live runs of the class issuance
 
 The reference CA of `relay-reference` checks the logic of the class `issuance`; whether it holds
-against a real CA shows only a live run. `relay-reference -live` starts the reference operator
-with its name domain `homes.<zone>` and the zone of the tester `tester.<zone>` below a delegated
-zone, serves that zone publicly and authoritatively for the duration of the run, and runs every
-class with the class `issuance` against Let's Encrypt. The zone of the organization is
-`relay-test.home-mandate.org`. The host that runs it holds the addresses of the name server of
-the delegation, lets port 53 (UDP and TCP) through only for the run and reaches Let's Encrypt,
-the logs and the sources of Certificate Transparency; each run has a directory of its own:
+against a real CA shows only a live run. `relay-reference -live` is the maintainers' proof before a
+release that the test tool and the reference hold against a real CA; it is no tool for operators,
+who run `relay-conformance` against their own operation (RELAY-v0 Section 8.3). It starts the
+reference operator with its name domain `homes.<zone>` and the zone of the tester `tester.<zone>`
+below a delegated zone, serves that zone publicly and authoritatively for the duration of the run,
+and runs every class with the class `issuance` against Let's Encrypt. The zone of the organization
+is `relay-test.home-mandate.org`. The host that runs it holds the addresses of the name server of
+the delegation, lets port 53 (UDP and TCP) through only for the run and reaches Let's Encrypt, the
+logs and the sources of Certificate Transparency; each run has a directory of its own:
 
 ```sh
 relay-reference -live staging -zone relay-test.home-mandate.org \
@@ -91,6 +93,9 @@ The staging run exits 3 (Certificate Transparency is checked only in production)
 failure; the production run exits 3 until `-ct-verify` exits 0. A production run obtains one
 real certificate under the zone. Both runs use the operator domain of the reference, which only
 the test host reaches.
+
+The release may attach the reports of the staging run, the production run and `-ct-verify` next
+to the report of `relay-reference`.
 
 ## After a patch
 

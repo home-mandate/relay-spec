@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/home-mandate/relay-spec/internal/dnsq"
+	"github.com/home-mandate/relay-spec/internal/refdns"
 	"github.com/home-mandate/relay-spec/internal/refop"
 )
 
@@ -95,8 +96,26 @@ func TestOnlyText(t *testing.T) {
 	}
 }
 
-func TestWaitTXT(t *testing.T) {
+// TestWaitTextsWaitsForTheSetAndTellsItsTTL: the tool waits until every name server shows
+// exactly the values, in any order, and learns the longest TTL of their records.
+func TestWaitTextsWaitsForTheSetAndTellsItsTTL(t *testing.T) {
 	r, env := serve(t, refop.Config{})
+	env.Timing.Visible, env.Timing.Poll = 150*time.Millisecond, 10*time.Millisecond
+	d := newDNSTools(env)
+	name := proofLabel + testOwnDomain
+	r.Operator.DNS().Replace(name, refdns.TypeTXT, refdns.TXT(name, 42, "b"), refdns.TXT(name, 7, "a"))
+	if ttl, err := d.waitTexts(ctx(t), name, []string{"a", "b"}); err != nil || ttl != 42 {
+		t.Errorf("both values: TTL %d, %v", ttl, err)
+	}
+	for what, want := range map[string][]string{"one of two": {"a"}, "a third": {"a", "b", "c"}, "none": nil} {
+		if _, err := d.waitTexts(ctx(t), name, want); err != errNotVisible {
+			t.Errorf("%s: %v", what, err)
+		}
+	}
+}
+
+func TestWaitTXT(t *testing.T) {
+	_, env := serve(t, refop.Config{})
 	env.Timing.Visible, env.Timing.Poll = 150*time.Millisecond, 10*time.Millisecond
 	d := newDNSTools(env)
 	name := proofLabel + testOwnDomain
@@ -114,7 +133,6 @@ func TestWaitTXT(t *testing.T) {
 	if err := d.waitTXT(cancelled, name, "value"); err == nil || err == errNotVisible {
 		t.Errorf("cancelled: %v", err)
 	}
-	_ = r
 	if _, err := systemNS(ctx(t), "invalid."); err == nil {
 		t.Log("the system resolver knows invalid.")
 	}

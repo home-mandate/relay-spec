@@ -253,7 +253,7 @@ func (c *CA) validate(z *authz, acct *account) *problem {
 	defer cancel()
 	sum := sha256.Sum256([]byte(z.token + "." + acct.thumbprint))
 	want := base64.RawURLEncoding.EncodeToString(sum[:])
-	values, err := c.cfg.DNS.TXT(ctx, "_acme-challenge."+z.name)
+	values, err := c.lookupTXT(ctx, "_acme-challenge."+z.name)
 	if err != nil {
 		return &problem{http.StatusBadRequest, "dns", "the TXT records cannot be looked up"}
 	}
@@ -268,6 +268,25 @@ func (c *CA) validate(z *authz, acct *account) *problem {
 		return &problem{http.StatusForbidden, "caa", "the CAA records forbid issuance"}
 	}
 	return nil
+}
+
+// lookupTXT returns the TXT records of the name, from what the CA keeps if it keeps them.
+func (c *CA) lookupTXT(ctx context.Context, name string) ([]string, error) {
+	now := time.Now()
+	c.mu.Lock()
+	kept, ok := c.txt[name]
+	c.mu.Unlock()
+	if ok && now.Before(kept.until) {
+		return kept.values, nil
+	}
+	values, err := c.cfg.DNS.TXT(ctx, name)
+	if err != nil || c.cfg.TXTCache <= 0 {
+		return values, err
+	}
+	c.mu.Lock()
+	c.txt[name] = keptTXT{values: values, until: now.Add(c.cfg.TXTCache)}
+	c.mu.Unlock()
+	return values, nil
 }
 
 // Certificates (RFC 8555 section 7.4).

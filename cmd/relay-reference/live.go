@@ -22,6 +22,8 @@ const (
 	liveRequest = 30 * time.Second
 	liveSlow    = 180 * time.Second
 	liveCleanup = 2 * time.Minute
+	// liveTTLUnit is a real second: the resolvers of the CA keep a record for its TTL.
+	liveTTLUnit = time.Second
 )
 
 // liveOptions are the flags of a live run.
@@ -77,6 +79,7 @@ func runLive(ctx context.Context, self string, o liveOptions, adjust func(*livec
 	env.Net.Lookup = liveLookup(env.Net.Lookup, systemLookup)
 	env.CAs, env.LogList, env.Sources = liveconf.DefaultCAs, nil, liveconf.DefaultSources
 	env.Timing.Request, env.Timing.Slow, env.Timing.Cleanup = liveRequest, liveSlow, liveCleanup
+	env.Timing.TTLUnit = liveTTLUnit
 	s.ACMEProduction = o.env == "production"
 	if adjust != nil {
 		adjust(&env, r, pub.Addr())

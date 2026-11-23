@@ -1565,7 +1565,13 @@ the name servers of the name domain. With the same account it then orders a cert
 wildcard name below the standard name, and with a second account, which it never reports, one for
 the standard name. The CA must refuse both because of the CAA records (`issuewild ";"` and
 `accounturi`, Section 6.3); only a refusal for the CAA records counts, and a refusal for another
-reason decides nothing, because a CA checks the CAA records only after a successful validation.
+reason decides nothing, because a CA checks the CAA records only after a successful validation;
+the report then shows what the CA said. The tool places these two orders together: the operator
+publishes both challenge values at once (Section 5.6), and the tool asks the CA to validate them
+only once they show on the name servers and the TTL of the value before has passed, because a
+resolver of the CA may hold the earlier record that long. It waits out a TTL of at most 600
+seconds; with a longer one it places neither order, so the two refusals cannot be judged and the
+result is incomplete.
 A run uses at most two accounts and three orders, and deactivates the accounts before it ends.
 This is what an operator that answers a CA otherwise than everyone else (Section 6.2) cannot hide
 from the test: the checks of the class `dns` read the records as gateways do, these orders show
@@ -1817,8 +1823,10 @@ the household as the sections say:
   is conformant only with the production environment and `-ct-verify`. Section 8.1 lists what no
   live test can check, and the report lists it as well; refusals of HTTP-01 and of a name without
   an account are among them. Section 8.4: a run in production obtains one real certificate.
-  `cas.md` names the ACME directories and the account URI prefix of the test environment. Gateways
-  are not affected; Section 12: none of this triggers an event.
+  `cas.md` names the ACME directories and the account URI prefix of the test environment. The
+  two refusals are ordered together, after the TTL of the earlier challenge value has passed, so
+  that a resolver of the CA no longer holds it. Gateways are not affected; Section 12: none of
+  this triggers an event.
 - Section 8.3: a production run leaves a file without keys, and `-ct-verify` with it completes the
   run: inclusion of the certificate in every log of the list that gave it an SCT, from RFC 6962
   logs by tree head and proof, from tiled logs (static-ct-api) by checkpoint and hash tiles, each

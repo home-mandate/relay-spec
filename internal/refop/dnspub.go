@@ -3,6 +3,7 @@
 package refop
 
 import (
+	"cmp"
 	"net/netip"
 	"strings"
 	"time"
@@ -16,7 +17,9 @@ const (
 	apexTTL     = 3600
 	longTTL     = 7200
 	challengeAt = "_acme-challenge."
-	proofAt     = "_home-mandate-relay."
+	// challengeTTL is the TTL of the challenge records, unless the configuration sets one.
+	challengeTTL = 60
+	proofAt      = "_home-mandate-relay."
 )
 
 // RelayAddresses are the addresses of relay_addresses in the metadata of the reference operator.
@@ -88,7 +91,7 @@ func (o *Operator) publishChallenge(inst *installation, values []string) {
 	name := challengeAt + o.stdName(inst)
 	rrs := make([]dnsmessage.Resource, len(values))
 	for i, v := range values {
-		rrs[i] = refdns.TXT(name, 60, v)
+		rrs[i] = refdns.TXT(name, cmp.Or(o.cfg.ChallengeTTL, challengeTTL), v)
 	}
 	if !o.cfg.Faults.Has(ChallengeBeforeSecondServer) {
 		o.dns.Replace(name, refdns.TypeTXT, rrs...)

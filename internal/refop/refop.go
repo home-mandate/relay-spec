@@ -96,6 +96,11 @@ type Config struct {
 	DNSLag time.Duration
 	// CAFaults are the defects of the reference CA that serves the class issuance.
 	CAFaults refca.Fault
+	// CATXTCache is how long the reference CA keeps the TXT records it looked up, as the
+	// resolver of a real CA keeps them for their TTL; zero keeps nothing.
+	CATXTCache time.Duration
+	// ChallengeTTL is the TTL of the challenge records; zero means 60 seconds.
+	ChallengeTTL uint32
 }
 
 // Operator is a reference operator.
@@ -133,7 +138,7 @@ func New(cfg Config) *Operator {
 	d := must(refdns.New(cfg.NameDomain, cfg.TesterZone))
 	o := &Operator{cfg: cfg, dns: d, ca: newIssuer(cfg.Operator), nonces: map[string]bool{},
 		insts: map[string]*installation{}, codes: map[string]*codeUse{}, homeIDs: map[string]bool{}}
-	o.acmeCA = refca.New(refca.Config{DNS: caView{o}, Faults: cfg.CAFaults})
+	o.acmeCA = refca.New(refca.Config{DNS: caView{o}, Faults: cfg.CAFaults, TXTCache: cfg.CATXTCache})
 	o.publishApex()
 	return o
 }
