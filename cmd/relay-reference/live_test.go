@@ -5,6 +5,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net"
 	"net/netip"
 	"os"
@@ -19,22 +20,11 @@ import (
 	"github.com/home-mandate/relay-spec/internal/ctlog"
 	"github.com/home-mandate/relay-spec/internal/liveconf"
 	"github.com/home-mandate/relay-spec/internal/refca"
+	"github.com/home-mandate/relay-spec/internal/refdns"
 	"github.com/home-mandate/relay-spec/internal/refop"
 )
 
 const liveZone = "relay-test.example.com"
-
-// freeUDPPort returns a loopback address with a port that was free a moment ago.
-func freeUDPPort(t *testing.T) string {
-	t.Helper()
-	c, err := net.ListenPacket("udp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	addr := c.LocalAddr().String()
-	_ = c.Close()
-	return addr
-}
 
 // soaOf asks the public DNS for the SOA of name and returns the rcode, or false without answer.
 func soaOf(addr, name string) (dnsmessage.RCode, bool) {
@@ -59,11 +49,18 @@ func soaOf(addr, name string) (dnsmessage.RCode, bool) {
 }
 
 // backToReference puts the reference CA, its logs and sources back into a live environment, so
-// that the test reaches no real CA; it also records what the public DNS answers during the run.
-func backToReference(t *testing.T, listen string, seen *[]string) func(*liveconf.Env, *refop.Running) {
-	return func(env *liveconf.Env, r *refop.Running) {
+// that the test reaches no real CA; it also records the address of the public DNS and what it
+// answers during the run.
+func backToReference(t *testing.T, listen *string, seen *[]string) func(*liveconf.Env, *refop.Running, string) {
+	return func(env *liveconf.Env, r *refop.Running, addr string) {
+		*listen = addr
 		if len(env.CAs) != 1 || env.CAs[0].Identity != "letsencrypt.org" || env.LogList != nil || env.Sources != liveconf.DefaultSources {
 			t.Errorf("a live run does not use Let's Encrypt, the list of Google and the sources: %+v", env.CAs)
+		}
+		// A live run resolves names outside the reference, such as those of the CA, the logs and
+		// the sources, with the system resolver; "localhost" stands for them here.
+		if _, err := env.Net.Lookup(context.Background(), "localhost"); err != nil {
+			t.Errorf("a live run cannot resolve a name outside the reference: %v", err)
 		}
 		ca := r.Operator.CA()
 		ep := liveconf.Endpoint{Directory: ca.Directory(), AccountPrefix: ca.AccountPrefix()}
@@ -71,7 +68,7 @@ func backToReference(t *testing.T, listen string, seen *[]string) func(*liveconf
 		env.LogList = func(context.Context) (*ctlog.List, error) { return ca.LogList(), nil }
 		env.Sources = liveconf.CTSources{CertSpotter: ca.CertSpotter(), CrtSh: ca.CrtSh()}
 		for _, name := range []string{liveZone, "example.org"} {
-			rcode, ok := soaOf(listen, name)
+			rcode, ok := soaOf(addr, name)
 			if !ok {
 				*seen = append(*seen, name+"=no answer")
 				continue
@@ -90,13 +87,13 @@ func TestALiveRunServesTheZoneOnlyWhileItRuns(t *testing.T) {
 	}
 	for _, env := range []string{"staging", "production"} {
 		t.Run(env, func(t *testing.T) {
-			listen := freeUDPPort(t)
-			o := liveOptions{env: env, zone: liveZone, listen: []string{listen}, ns: []netip.Addr{netip.MustParseAddr("192.0.2.53")}, stateDir: t.TempDir()}
+			o := liveOptions{env: env, zone: liveZone, listen: []string{"127.0.0.1:0"}, ns: []netip.Addr{netip.MustParseAddr("192.0.2.53")}, stateDir: t.TempDir()}
 			if err := o.check(); err != nil {
 				t.Fatal(err)
 			}
+			var listen string
 			var seen []string
-			res := runLive(context.Background(), self, o, backToReference(t, listen, &seen))
+			res := runLive(context.Background(), self, o, backToReference(t, &listen, &seen))
 			if len(res.Report.Failures) != 0 || res.Exit != liveconf.ExitIncomplete {
 				t.Fatalf("exit %d (%s), failures %+v", res.Exit, res.Message, res.Report.Failures)
 			}
@@ -154,5 +151,39 @@ func TestALiveRunWithoutItsPortIsIncomplete(t *testing.T) {
 		"-ns-address", "192.0.2.53", "-state", dir, "-report", filepath.Join(dir, "r.json")}, &bytes.Buffer{}, &errOut)
 	if code != liveconf.ExitIncomplete || !strings.Contains(errOut.String(), "cannot listen") {
 		t.Errorf("exit %d, %s", code, errOut.String())
+	}
+}
+
+// TestTheLiveLookupAsksTheReferenceFirst: a name of the reference resolves there, a name the
+// reference does not know goes to the system, and any other error of the reference stays.
+func TestTheLiveLookupAsksTheReferenceFirst(t *testing.T) {
+	refAddr, sysAddr := netip.MustParseAddr("127.0.0.53"), netip.MustParseAddr("192.0.2.1")
+	broken := errors.New("broken")
+	ref := func(_ context.Context, host string) ([]netip.Addr, error) {
+		switch host {
+		case "ns1.example.net":
+			return []netip.Addr{refAddr}, nil
+		case "broken.example.net":
+			return nil, broken
+		}
+		return nil, refdns.ErrNoSuchHost
+	}
+	var asked []string
+	sys := func(_ context.Context, host string) ([]netip.Addr, error) {
+		asked = append(asked, host)
+		return []netip.Addr{sysAddr}, nil
+	}
+	lookup := liveLookup(ref, sys)
+	if a, err := lookup(context.Background(), "ns1.example.net"); err != nil || a[0] != refAddr {
+		t.Errorf("a name of the reference: %v %v", a, err)
+	}
+	if a, err := lookup(context.Background(), "acme-v02.api.letsencrypt.org"); err != nil || a[0] != sysAddr {
+		t.Errorf("a name outside the reference: %v %v", a, err)
+	}
+	if _, err := lookup(context.Background(), "broken.example.net"); !errors.Is(err, broken) {
+		t.Errorf("an error of the reference: %v", err)
+	}
+	if !slices.Equal(asked, []string{"acme-v02.api.letsencrypt.org"}) {
+		t.Errorf("the system was asked for %v", asked)
 	}
 }

@@ -34,6 +34,7 @@ const (
 	soaExpire      = 86400
 	soaMinimum     = 60
 	prefixBitsIPv6 = 64
+	listenAttempts = 10
 )
 
 // PublicConfig configures the public view of a DNS (Public).
@@ -105,23 +106,32 @@ func (d *DNS) ServePublic(cfg PublicConfig) (*Public, error) {
 	return p, nil
 }
 
-// listen binds one address for UDP and, on the same port, for TCP.
+// listen binds one address for UDP and, on the same port, for TCP. With port 0 the system picks
+// the UDP port, which TCP may hold already; then it picks again, up to listenAttempts times.
 func (p *Public) listen(address string) error {
 	addr, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
 		return err
 	}
-	udp, err := net.ListenUDP("udp", addr)
-	if err != nil {
-		return err
+	attempts := 1
+	if addr.Port == 0 {
+		attempts = listenAttempts
 	}
-	p.udp = append(p.udp, udp)
-	tcp, err := net.Listen("tcp", udp.LocalAddr().String())
-	if err != nil {
-		return err
+	for {
+		udp, err := net.ListenUDP("udp", addr)
+		if err != nil {
+			return err
+		}
+		tcp, err := net.Listen("tcp", udp.LocalAddr().String())
+		if err == nil {
+			p.udp, p.tcp = append(p.udp, udp), append(p.tcp, tcp)
+			return nil
+		}
+		_ = udp.Close()
+		if attempts--; attempts == 0 {
+			return err
+		}
 	}
-	p.tcp = append(p.tcp, tcp)
-	return nil
 }
 
 // Addr returns the first address the view listens on.

@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/x509"
 	"errors"
+	"net"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -56,8 +57,9 @@ func (o liveOptions) check() error {
 // runLive runs every class against the reference operator, with its name domain and the zone of
 // the tester below the delegated zone, which a public DNS serves for the duration of the run,
 // and the class issuance against Let's Encrypt (RELAY-v0 section 8.3). adjust, if set, changes
-// the environment before the run; tests put the reference CA back with it.
-func runLive(ctx context.Context, self string, o liveOptions, adjust func(*liveconf.Env, *refop.Running)) liveconf.Result {
+// the environment before the run and learns the address of the public DNS; tests put the
+// reference CA back with it.
+func runLive(ctx context.Context, self string, o liveOptions, adjust func(*liveconf.Env, *refop.Running, string)) liveconf.Result {
 	cfg := refop.Config{NameDomain: "homes." + o.zone, TesterZone: "tester." + o.zone}
 	r, env, s, stop := startReference(self, filepath.Join(o.stateDir, "state.json"), cfg)
 	defer stop()
@@ -72,11 +74,32 @@ func runLive(ctx context.Context, self string, o liveOptions, adjust func(*livec
 	}
 	roots.AddCert(r.RootCA)
 	env.Roots = roots
+	env.Net.Lookup = liveLookup(env.Net.Lookup, systemLookup)
 	env.CAs, env.LogList, env.Sources = liveconf.DefaultCAs, nil, liveconf.DefaultSources
 	env.Timing.Request, env.Timing.Slow, env.Timing.Cleanup = liveRequest, liveSlow, liveCleanup
 	s.ACMEProduction = o.env == "production"
 	if adjust != nil {
-		adjust(&env, r)
+		adjust(&env, r, pub.Addr())
 	}
 	return liveconf.RunWith(ctx, s, env)
+}
+
+// lookupFunc resolves a host name to addresses.
+type lookupFunc func(ctx context.Context, host string) ([]netip.Addr, error)
+
+// systemLookup resolves with the resolver of the host.
+func systemLookup(ctx context.Context, host string) ([]netip.Addr, error) {
+	return net.DefaultResolver.LookupNetIP(ctx, "ip", host)
+}
+
+// liveLookup resolves the names of the reference there and every name the reference does not
+// know, such as those of the CA, the logs and the sources, with system.
+func liveLookup(ref, system lookupFunc) lookupFunc {
+	return func(ctx context.Context, host string) ([]netip.Addr, error) {
+		addrs, err := ref(ctx, host)
+		if errors.Is(err, refdns.ErrNoSuchHost) {
+			return system(ctx, host)
+		}
+		return addrs, err
+	}
 }
