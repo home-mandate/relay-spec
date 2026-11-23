@@ -277,3 +277,73 @@ func TestThePublicServerListensOnEveryAddress(t *testing.T) {
 		}
 	}
 }
+
+// TestThePublicServerDropsWhatIsNoQuery: no answer to garbage, to a response or to two
+// questions; over TCP a bad length or a short query ends the connection.
+func TestThePublicServerDropsWhatIsNoQuery(t *testing.T) {
+	_, p := public(t, 1000, 1000)
+	response := question(apex, dnsmessage.TypeSOA, false)
+	response[2] |= 0x80
+	two := dnsmessage.NewBuilder(nil, dnsmessage.Header{ID: 1})
+	_ = two.StartQuestions()
+	for range 2 {
+		_ = two.Question(dnsmessage.Question{Name: dnsmessage.MustNewName(apex + "."), Type: dnsmessage.TypeSOA, Class: dnsmessage.ClassINET})
+	}
+	twoWire, _ := two.Finish()
+	for name, wire := range map[string][]byte{"garbage": []byte("no dns"), "a response": response, "two questions": twoWire} {
+		if _, ok := askUDP(t, p.Addr(), wire); ok {
+			t.Errorf("%s over UDP: answered", name)
+		}
+		if !closedAfter(t, p.Addr(), append(binary.BigEndian.AppendUint16(nil, uint16(len(wire))), wire...)) {
+			t.Errorf("%s over TCP: still open", name)
+		}
+	}
+	if !closedAfter(t, p.Addr(), []byte{0xff, 0xff}) {
+		t.Error("a length beyond a query: still open")
+	}
+	if !closedAfter(t, p.Addr(), []byte{0, 100, 1, 2}) {
+		t.Error("a short query: still open")
+	}
+}
+
+// closedAfter writes wire on a new TCP connection, half-closes it and reports whether the
+// server closes it without an answer.
+func closedAfter(t *testing.T, addr string, wire []byte) bool {
+	t.Helper()
+	c, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	_ = c.SetDeadline(time.Now().Add(2 * time.Second))
+	_, _ = c.Write(wire)
+	_ = c.(*net.TCPConn).CloseWrite()
+	n, err := c.Read(make([]byte, 1))
+	return n == 0 && err == io.EOF
+}
+
+// TestAnAddressInUseIsAnError: a UDP or a TCP port already taken fails the view.
+func TestAnAddressInUseIsAnError(t *testing.T) {
+	d, err := refdns.New("homes." + apex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	ns := []netip.Addr{netip.MustParseAddr("192.0.2.53")}
+	udp, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer udp.Close()
+	tcp, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tcp.Close()
+	for name, addr := range map[string]string{"UDP": udp.LocalAddr().String(), "TCP": tcp.Addr().String()} {
+		if p, err := d.ServePublic(refdns.PublicConfig{Apex: apex, Listen: []string{addr}, NSAddrs: ns}); err == nil {
+			p.Close()
+			t.Errorf("%s in use: served", name)
+		}
+	}
+}

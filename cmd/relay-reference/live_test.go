@@ -139,3 +139,20 @@ func TestLiveFlags(t *testing.T) {
 		t.Errorf("-ct-verify without a file: exit %d, %s", code, errOut.String())
 	}
 }
+
+// TestALiveRunWithoutItsPortIsIncomplete: when the public DNS cannot listen, the run reaches no
+// CA and ends incomplete.
+func TestALiveRunWithoutItsPortIsIncomplete(t *testing.T) {
+	busy, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer busy.Close()
+	dir := t.TempDir()
+	var errOut bytes.Buffer
+	code := run(context.Background(), []string{"-live", "staging", "-zone", liveZone, "-dns-listen", busy.LocalAddr().String(),
+		"-ns-address", "192.0.2.53", "-state", dir, "-report", filepath.Join(dir, "r.json")}, &bytes.Buffer{}, &errOut)
+	if code != liveconf.ExitIncomplete || !strings.Contains(errOut.String(), "cannot listen") {
+		t.Errorf("exit %d, %s", code, errOut.String())
+	}
+}
