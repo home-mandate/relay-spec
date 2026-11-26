@@ -87,10 +87,13 @@ type fetched struct {
 // and a request has a total time limit. The client sends no User-Agent of its own choosing.
 type Web struct {
 	client *http.Client
-	timing Timing
-	policy func(netip.Addr) bool
-	dial   func(ctx context.Context, network, addr string) (net.Conn, error)
-	roots  *x509.CertPool
+	// sources reaches the search sources of Certificate Transparency, third parties that need
+	// not speak TLS 1.3 like the operator (RELAY-v0 section 8.3).
+	sources *http.Client
+	timing  Timing
+	policy  func(netip.Addr) bool
+	dial    func(ctx context.Context, network, addr string) (net.Conn, error)
+	roots   *x509.CertPool
 
 	mu    sync.Mutex
 	last  time.Time
@@ -99,29 +102,36 @@ type Web struct {
 
 func newWeb(env Env) *Web {
 	dialer := netguard.New(env.Net)
-	// The transport and the client only bound the longest request; each request has its own
-	// limit in its context.
+	return &Web{
+		client:  newClient(dialer, env, tls.VersionTLS13),
+		sources: newClient(dialer, env, tls.VersionTLS12),
+		timing:  env.Timing, policy: dialer.Policy(), dial: dialer.DialContext, roots: env.Roots,
+	}
+}
+
+// newClient is an HTTP client through the address filter with TLS from minVersion. The transport
+// and the client only bound the longest request; each request has its own limit in its context.
+func newClient(dialer *netguard.Dialer, env Env, minVersion uint16) *http.Client {
 	longest := max(env.Timing.Request, env.Timing.Slow, env.Timing.Source)
 	transport := &http.Transport{
 		Proxy:                  nil,
 		DialContext:            dialer.DialContext,
 		DisableCompression:     true,
 		DisableKeepAlives:      true,
-		TLSClientConfig:        &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: env.Roots},
+		TLSClientConfig:        &tls.Config{MinVersion: minVersion, RootCAs: env.Roots},
 		TLSHandshakeTimeout:    handshakeTimeout,
 		ResponseHeaderTimeout:  longest,
 		MaxResponseHeaderBytes: maxHeaderBytes,
 		// A non-nil, empty map keeps the transport from offering HTTP/2.
 		TLSNextProto: map[string]func(string, *tls.Conn) http.RoundTripper{},
 	}
-	client := &http.Client{
+	return &http.Client{
 		Transport: transport,
 		Timeout:   longest,
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}
-	return &Web{client: client, timing: env.Timing, policy: dialer.Policy(), dial: dialer.DialContext, roots: env.Roots}
 }
 
 // onlyOlderTLS reports whether host completes a handshake on port 443 with TLS 1.2 and a valid
@@ -146,11 +156,11 @@ func (w *Web) onlyOlderTLS(ctx context.Context, host string) bool {
 // get fetches rawURL and reads at most limit bytes of the body. It honours Retry-After within
 // the budget of the run.
 func (w *Web) get(ctx context.Context, rawURL string, limit int64) (fetched, error) {
-	return w.getWithin(ctx, rawURL, limit, w.timing.Request)
+	return w.getWithin(ctx, w.client, rawURL, limit, w.timing.Request)
 }
 
-// getWithin is get with the limit of each attempt.
-func (w *Web) getWithin(ctx context.Context, rawURL string, limit int64, timeout time.Duration) (fetched, error) {
+// getWithin is get through the client, with the limit of each attempt.
+func (w *Web) getWithin(ctx context.Context, c *http.Client, rawURL string, limit int64, timeout time.Duration) (fetched, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil || u.Scheme != "https" {
 		return fetched{}, errNotHTTPS
@@ -159,7 +169,7 @@ func (w *Web) getWithin(ctx context.Context, rawURL string, limit int64, timeout
 		if err := w.pace(ctx); err != nil {
 			return fetched{}, classify(err)
 		}
-		res, err := w.send(ctx, http.MethodGet, rawURL, nil, "", limit, timeout)
+		res, err := w.send(ctx, c, http.MethodGet, rawURL, nil, "", limit, timeout)
 		if err != nil {
 			return fetched{}, classify(err)
 		}
@@ -181,14 +191,14 @@ func (w *Web) getWithin(ctx context.Context, rawURL string, limit int64, timeout
 }
 
 // send makes one request, without pacing and without repeating it.
-func (w *Web) send(ctx context.Context, method, rawURL string, body []byte, contentType string, limit int64, timeout time.Duration) (fetched, error) {
+func (w *Web) send(ctx context.Context, c *http.Client, method, rawURL string, body []byte, contentType string, limit int64, timeout time.Duration) (fetched, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	req := must(http.NewRequestWithContext(ctx, method, rawURL, bytes.NewReader(body)))
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
-	resp, err := w.client.Do(req)
+	resp, err := c.Do(req)
 	if err != nil {
 		return fetched{}, scrub(err)
 	}
@@ -217,7 +227,7 @@ func (w *Web) Do(ctx context.Context, method, rawURL string, body []byte, conten
 	if slow {
 		timeout = w.timing.Slow
 	}
-	res, err := w.send(ctx, method, rawURL, body, contentType, enroll.MaxBody, timeout)
+	res, err := w.send(ctx, w.client, method, rawURL, body, contentType, enroll.MaxBody, timeout)
 	if err != nil {
 		return enroll.Response{}, classify(err)
 	}

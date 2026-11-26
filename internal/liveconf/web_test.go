@@ -4,6 +4,7 @@ package liveconf
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"io"
 	"log"
@@ -451,5 +452,27 @@ func TestACancelledRunSpendsNoPause(t *testing.T) {
 	var list []int
 	if err := w.getList(cancelled, url, &list); err == nil || w.spent != 0 {
 		t.Errorf("error %v, spent %v", err, w.spent)
+	}
+}
+
+// TestASourceIsReachedWithTLS12: a search source is a third party, not bound to TLS 1.3 like
+// the operator (RELAY-v0 sections 3, 5 and 8.3); crt.sh speaks TLS 1.2 only.
+func TestASourceIsReachedWithTLS12(t *testing.T) {
+	w, url := webForTLS(t, okHandler(`[1]`), sourceTiming(), tls.VersionTLS12)
+	var list []int
+	if err := w.getList(ctx(t), url, &list); err != nil || len(list) != 1 {
+		t.Fatalf("a source with TLS 1.2: %v %v", list, err)
+	}
+	if _, err := w.get(ctx(t), url, 10); err == nil {
+		t.Error("an ordinary request accepts TLS 1.2")
+	}
+	if _, err := w.Do(ctx(t), http.MethodGet, url, nil, "", false); err == nil {
+		t.Error("a request of the enrollment accepts TLS 1.2")
+	}
+	for name, c := range map[string]*http.Client{"operator": w.client, "sources": w.sources} {
+		tr := c.Transport.(*http.Transport)
+		if tr.Proxy != nil || tr.TLSNextProto == nil || len(tr.TLSNextProto) != 0 || !tr.DisableKeepAlives {
+			t.Errorf("%s: proxy, HTTP/2 or keep-alive", name)
+		}
 	}
 }
