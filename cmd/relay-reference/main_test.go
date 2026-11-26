@@ -37,7 +37,7 @@ func TestTheReferenceConformsToEveryClass(t *testing.T) {
 	if err := json.Unmarshal(data, &rep); err != nil {
 		t.Fatal(err)
 	}
-	if !rep.Conforms || len(rep.Failures) != 0 || len(rep.Incomplete) != 0 || rep.Spec != liveconf.SpecName || rep.Version != version || rep.CTVerified == "" {
+	if !rep.Conforms || len(rep.Failures) != 0 || len(rep.Incomplete) != 0 || rep.Spec != liveconf.SpecName || rep.Version != toolVersion() || rep.CTVerified == "" {
 		t.Errorf("report: conforms %v, failures %v, incomplete %v, spec %q, version %q", rep.Conforms, rep.Failures, rep.Incomplete, rep.Spec, rep.Version)
 	}
 	for _, class := range liveconf.AllClasses {

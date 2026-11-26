@@ -24,7 +24,7 @@ import (
 	"github.com/home-mandate/relay-spec/internal/liveconf"
 )
 
-// version is set with -ldflags "-X main.version=v0.1.0"; without it the module version of
+// version is set with -ldflags "-X main.version=0.1.0"; without it the module version of
 // the build is used (go install ...@version).
 var version string
 
