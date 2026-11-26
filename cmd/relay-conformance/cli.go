@@ -70,7 +70,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 	flags.SetOutput(io.Discard)
 	var codes, codeFiles list
 	listChecks := flags.Bool("list", false, "print the checks")
-	s := liveconf.Settings{Version: buildVersion(version, debug.ReadBuildInfo)}
+	s := liveconf.Settings{Version: liveconf.BuildVersion(version, debug.ReadBuildInfo)}
 	var classes string
 	flags.StringVar(&s.Operator, "operator", "", "operator domain")
 	flags.Var(&codes, "code", "pairing code (repeatable)")
@@ -186,16 +186,4 @@ func readCodeFile(name string) (string, error) {
 		return "", errors.New("a code file cannot be read or is too large")
 	}
 	return strings.TrimSpace(string(data)), nil
-}
-
-// buildVersion returns the version of the tool: the one set at build time, else the module
-// version of the build, else "devel".
-func buildVersion(ldflags string, read func() (*debug.BuildInfo, bool)) string {
-	if ldflags != "" {
-		return ldflags
-	}
-	if info, ok := read(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
-		return info.Main.Version
-	}
-	return "devel"
 }

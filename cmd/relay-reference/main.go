@@ -31,6 +31,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -42,8 +43,12 @@ import (
 	"github.com/home-mandate/relay-spec/internal/refrelay"
 )
 
-// version is set at build time: -ldflags "-X main.version=<version>".
-var version = "devel"
+// version is set at build time: -ldflags "-X main.version=0.1.0"; without it the module version
+// of the build is used (go install ...@version).
+var version string
+
+// toolVersion is the version the reports name (liveconf.BuildVersion).
+func toolVersion() string { return liveconf.BuildVersion(version, debug.ReadBuildInfo) }
 
 // runLimit bounds the whole run against the reference; liveLimit a live run.
 const (
@@ -114,7 +119,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stderr, usage)
 			return liveconf.ExitUsage
 		}
-		res = liveconf.ExecuteCTVerify(ctx, liveconf.Settings{CTVerifyPath: *ctVerify, Version: version})
+		res = liveconf.ExecuteCTVerify(ctx, liveconf.Settings{CTVerifyPath: *ctVerify, Version: toolVersion()})
 	case o.env != "":
 		if err := o.check(); err != nil {
 			fmt.Fprintln(stderr, "relay-reference:", err)
@@ -212,7 +217,7 @@ func startReference(self, statePath string, cfg refop.Config) (*refop.Running, l
 		OwnDomain: "home." + tester,
 		DNSHook:   self + " " + hookCommand + " " + base,
 		StatePath: statePath,
-		Version:   version,
+		Version:   toolVersion(),
 		// The reference CA plays the production environment of a CA, with its own logs.
 		ACMEProduction: true,
 	}
@@ -230,7 +235,7 @@ func runAgainstReference(ctx context.Context, self, statePath string) liveconf.R
 		return res
 	}
 	// The logs of the reference CA include at once, so the run is completed right away.
-	return liveconf.CTVerifyWith(ctx, liveconf.Settings{CTVerifyPath: res.CTFile, Version: version}, env)
+	return liveconf.CTVerifyWith(ctx, liveconf.Settings{CTVerifyPath: res.CTFile, Version: toolVersion()}, env)
 }
 
 // caEndpoint is the ACME endpoint of the reference CA of the operator.

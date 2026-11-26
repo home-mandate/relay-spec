@@ -1,8 +1,8 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-# Home-Mandate Relay Specification v0 (Draft)
+# Home-Mandate Relay Specification v0
 
-Status: **Working draft of the first version.** This document, its schemas, its examples, its
+Status: **Released, not frozen.** This document, its schemas, its examples, its
 conformance cases and its reference code are versioned by the tags `vX.Y.Z` of the repository
 [home-mandate/relay-spec](https://github.com/home-mandate/relay-spec), independently of the
 Home-Mandate Specification ([home-mandate/spec](https://github.com/home-mandate/spec), called

@@ -12,12 +12,29 @@ issuance of certificates, public names and protection levels, Certificate Transp
 checks, and what an operator must and must not do. With conformance cases, a live test tool for
 operators and Go reference code.
 
-Status: **draft of the first version (v0.1.0)**, not released yet. It requires the Home-Mandate
-Specification v0.2.0 or later (Section 11.7 "Remote access" and the audit format `audit/v1`
-there; RELAY-v0 Section 12 maps its `relay.*` events). Versions are the tags
-`vX.Y.Z` of this repository; nothing is frozen before a relay and a gateway have worked
-together (RELAY-v0 Section 11). Home-Mandate Cloud is the first operator to implement it, and
-Home-Mandate for Home Assistant the first gateway.
+Status: released, not frozen; the newest version is the [latest
+release](https://github.com/home-mandate/relay-spec/releases/latest). It requires the Home-Mandate
+Specification v0.2.0 or later (Section 11.7 "Remote access" and the audit format `audit/v1` there;
+RELAY-v0 Section 12 maps its `relay.*` events). Versions are the tags `vX.Y.Z` of this repository;
+nothing is frozen before a relay and a gateway have worked together (RELAY-v0 Section 11).
+Home-Mandate Cloud is the first operator to implement it, and Home-Mandate for Home Assistant the
+first gateway.
+
+## Testing an operator
+
+An operator tests its own operation with `relay-conformance` (RELAY-v0 Section 8.3). Install the
+tool of the newest release, or of the tag `vX.Y.Z` you test against; the report names the
+version, and a claim of conformance names it too:
+
+```sh
+go install github.com/home-mandate/relay-spec/cmd/relay-conformance@latest
+relay-conformance -help   # the call, the codes, the classes and the exit codes (exit 2)
+relay-conformance -list   # every check with its section
+```
+
+Every release attaches `conformance-report.json`, the report of the same tool against the
+reference of this repository, with an attestation of its build (`gh attestation verify
+conformance-report.json -R home-mandate/relay-spec`).
 
 ## Contents
 
