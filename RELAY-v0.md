@@ -1813,7 +1813,10 @@ the household as the sections say:
 
 ## Changelog
 
-### Unreleased
+### v0.1.0
+
+The first version of the Relay Specification in its own repository. It requires SPEC-v0 `v0.2.0`,
+and nothing in it is frozen yet (Section 11).
 
 - Section 8: a fifth class `issuance` checks what an operator claims with `acme_cas` and its CAA
   records. The test tool, as the gateway of the second installation, obtains a certificate for
