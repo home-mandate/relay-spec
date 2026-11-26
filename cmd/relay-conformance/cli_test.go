@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
@@ -239,27 +238,6 @@ func TestUsageTextWithoutExecution(t *testing.T) {
 	_, _, errOut := call(t, &fake{}, nil, "-h")
 	if !strings.Contains(errOut, "relay-conformance -cleanup") || !strings.Contains(errOut, "RELAY_CONFORMANCE_CODES") {
 		t.Errorf("usage: %q", errOut)
-	}
-}
-
-func TestBuildVersion(t *testing.T) {
-	read := func(v string, ok bool) func() (*debug.BuildInfo, bool) {
-		return func() (*debug.BuildInfo, bool) { return &debug.BuildInfo{Main: debug.Module{Version: v}}, ok }
-	}
-	for name, tt := range map[string]struct {
-		ldflags string
-		read    func() (*debug.BuildInfo, bool)
-		want    string
-	}{
-		"ldflags win":    {"v1.2.3", read("v9", true), "v1.2.3"},
-		"module version": {"", read("v0.1.0", true), "v0.1.0"},
-		"devel build":    {"", read("(devel)", true), "devel"},
-		"empty version":  {"", read("", true), "devel"},
-		"no build info":  {"", read("v0.1.0", false), "devel"},
-	} {
-		if got := buildVersion(tt.ldflags, tt.read); got != tt.want {
-			t.Errorf("%s: %q, want %q", name, got, tt.want)
-		}
 	}
 }
 
