@@ -23,7 +23,7 @@ import (
 // testTiming is DefaultTiming made small; everything still waits in real time.
 func testTiming() Timing {
 	return Timing{
-		Request: 5 * time.Second, Slow: 10 * time.Second, Hook: 5 * time.Second, Visible: 2 * time.Second, Poll: 20 * time.Millisecond, Cleanup: 5 * time.Second, RetryBudget: 300 * time.Millisecond,
+		Request: 5 * time.Second, Slow: 10 * time.Second, Hook: 5 * time.Second, Source: 5 * time.Second, SourcePause: 20 * time.Millisecond, Visible: 2 * time.Second, Poll: 20 * time.Millisecond, Cleanup: 5 * time.Second, RetryBudget: 300 * time.Millisecond,
 		RetryUnit: 10 * time.Millisecond, TTLUnit: 10 * time.Millisecond, Gap: time.Millisecond, Jitter: 2 * time.Millisecond,
 		Tunnel: 3 * time.Second, Close: 2 * time.Second, Slack: 150 * time.Millisecond, ControlWindow: 120 * time.Millisecond, Deny: 600 * time.Millisecond,
 	}

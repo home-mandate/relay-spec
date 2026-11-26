@@ -61,6 +61,9 @@ func backToReference(t *testing.T, listen *string, seen *[]string) func(*livecon
 			t.Errorf("a live run waits out a TTL in units of %v", env.Timing.TTLUnit)
 		}
 		env.Timing.TTLUnit = time.Millisecond
+		if env.Timing.Source != liveconf.DefaultTiming.Source || env.Timing.SourcePause != liveconf.DefaultTiming.SourcePause {
+			t.Errorf("a live run gives the search sources %v and pauses %v", env.Timing.Source, env.Timing.SourcePause)
+		}
 		// A live run resolves names outside the reference, such as those of the CA, the logs and
 		// the sources, with the system resolver; "localhost" stands for them here.
 		if _, err := env.Net.Lookup(context.Background(), "localhost"); err != nil {

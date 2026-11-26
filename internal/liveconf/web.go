@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"io"
 	"math/rand/v2"
 	"net"
@@ -52,6 +53,10 @@ func (e *netFailure) Error() string { return "network failure: " + e.kind }
 // budget (RELAY-v0 section 8.3).
 var errRateLimited = errors.New("the operator limits the rate of requests")
 
+// errWaitTooLong is a rate limit whose Retry-After the run does not wait for: longer than its
+// budget, or repeated too often.
+var errWaitTooLong = fmt.Errorf("%w for longer than the run waits", errRateLimited)
+
 var errNotHTTPS = errors.New("only https URLs are fetched")
 
 func classify(err error) *netFailure {
@@ -94,6 +99,9 @@ type Web struct {
 
 func newWeb(env Env) *Web {
 	dialer := netguard.New(env.Net)
+	// The transport and the client only bound the longest request; each request has its own
+	// limit in its context.
+	longest := max(env.Timing.Request, env.Timing.Slow, env.Timing.Source)
 	transport := &http.Transport{
 		Proxy:                  nil,
 		DialContext:            dialer.DialContext,
@@ -101,14 +109,14 @@ func newWeb(env Env) *Web {
 		DisableKeepAlives:      true,
 		TLSClientConfig:        &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: env.Roots},
 		TLSHandshakeTimeout:    handshakeTimeout,
-		ResponseHeaderTimeout:  env.Timing.Request,
+		ResponseHeaderTimeout:  longest,
 		MaxResponseHeaderBytes: maxHeaderBytes,
 		// A non-nil, empty map keeps the transport from offering HTTP/2.
 		TLSNextProto: map[string]func(string, *tls.Conn) http.RoundTripper{},
 	}
 	client := &http.Client{
 		Transport: transport,
-		Timeout:   max(env.Timing.Request, env.Timing.Slow),
+		Timeout:   longest,
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
@@ -138,6 +146,11 @@ func (w *Web) onlyOlderTLS(ctx context.Context, host string) bool {
 // get fetches rawURL and reads at most limit bytes of the body. It honours Retry-After within
 // the budget of the run.
 func (w *Web) get(ctx context.Context, rawURL string, limit int64) (fetched, error) {
+	return w.getWithin(ctx, rawURL, limit, w.timing.Request)
+}
+
+// getWithin is get with the limit of each attempt.
+func (w *Web) getWithin(ctx context.Context, rawURL string, limit int64, timeout time.Duration) (fetched, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil || u.Scheme != "https" {
 		return fetched{}, errNotHTTPS
@@ -146,7 +159,7 @@ func (w *Web) get(ctx context.Context, rawURL string, limit int64) (fetched, err
 		if err := w.pace(ctx); err != nil {
 			return fetched{}, classify(err)
 		}
-		res, err := w.send(ctx, http.MethodGet, rawURL, nil, "", limit, w.timing.Request)
+		res, err := w.send(ctx, http.MethodGet, rawURL, nil, "", limit, timeout)
 		if err != nil {
 			return fetched{}, classify(err)
 		}
@@ -154,9 +167,12 @@ func (w *Web) get(ctx context.Context, rawURL string, limit int64) (fetched, err
 		if res.Status != http.StatusTooManyRequests && !(res.Status == http.StatusServiceUnavailable && retryAfter != "") {
 			return res, nil
 		}
-		wait := w.retryWait(retryAfter)
-		if retryAfter == "" || attempt == maxRetries || !w.spend(wait) {
+		if retryAfter == "" {
 			return fetched{}, errRateLimited
+		}
+		wait := w.retryWait(retryAfter)
+		if attempt == maxRetries || !w.spend(wait) {
+			return fetched{}, errWaitTooLong
 		}
 		if err := sleep(ctx, wait); err != nil {
 			return fetched{}, classify(err)

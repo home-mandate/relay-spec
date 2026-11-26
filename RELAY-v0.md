@@ -1594,13 +1594,15 @@ the SCT, makes the result incomplete until then, and the call can be repeated; a
 not answer, or whose tree head does not verify with the key of the list, does so as well, because
 that says nothing about the entry. A log that does not include the certificate in a tree head
 from after its maximum merge delay, or whose proof does not lead to its verified tree head, fails
-the check. Through the two sources of
-`ct-sources.md` of the Home-Mandate Specification, both of which must answer, the tool also checks
-that Certificate Transparency shows no certificate for the standard name, or for a wildcard name
-that covers it, with another key than the one of the run, that is valid at some time since the
-run began. It then writes the report of the whole run. The test shows a correct setup at one
-time; it cannot rule out an operator that deceives on purpose later, which the monitoring of the
-gateway covers (Section 6.7).
+the check. Through the two sources of `ct-sources.md` of the Home-Mandate Specification, both of
+which must answer (the tool gives a source two minutes for an answer, and asks it up to three
+times, with pauses from the budget for waiting of the run, when it cannot be reached, does not
+answer, limits the rate or fails with a server error), the tool also checks that Certificate
+Transparency shows no certificate for the standard name, or for a wildcard name that covers it,
+with another key than the one of the run, that is valid at some time since the run began. It then
+writes the report of the whole run. The test shows a correct setup at one time; it cannot rule out
+an operator that deceives on purpose later, which the monitoring of the gateway covers
+(Section 6.7).
 
 The tool honours `Retry-After` and spaces its attempts, so that the limits of an operator do not
 fail it. A run creates at most two installations and unpairs every one it created before it ends, also when a
@@ -1834,6 +1836,9 @@ the household as the sections say:
   entry makes the result incomplete, after it a failure, and a tree head that does not verify
   leaves the result incomplete. The snapshot counts a certificate for the
   standard name or a covering wildcard with another key that is valid at some time since the run.
+  A search source has two minutes for an answer and is asked up to three times, with pauses from
+  the budget for waiting, when it cannot be reached, does not answer, limits the rate or fails
+  with a server error.
 - Normative change, Sections 3 and 6.4: before its `from`, an operator MAY withdraw a planned set
   of relay addresses or move its `from` later, never earlier; a set with other addresses is a new
   set with its own 30 days, and a withdrawal ends the duty to accept agent connections at the

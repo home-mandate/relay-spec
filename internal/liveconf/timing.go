@@ -12,6 +12,9 @@ type Timing struct {
 	// Slow is the limit of a request that waits for DNS: a gateway allows at least 150 seconds
 	// for such a response (RELAY-v0 section 5.1).
 	Slow time.Duration
+	// Source is the limit of one request to a search source of Certificate Transparency,
+	// which may take long to answer; SourcePause is the pause before it is asked again.
+	Source, SourcePause time.Duration
 	// Hook is the limit of one call of the DNS hook.
 	Hook time.Duration
 	// Visible is how long the tool waits for a record of the tester to show on the name
@@ -55,6 +58,8 @@ var DefaultTiming = Timing{
 	Request:       30 * time.Second,
 	Slow:          180 * time.Second,
 	Hook:          60 * time.Second,
+	Source:        2 * time.Minute,
+	SourcePause:   30 * time.Second,
 	Visible:       10 * time.Minute,
 	Poll:          5 * time.Second,
 	Cleanup:       5 * time.Minute,

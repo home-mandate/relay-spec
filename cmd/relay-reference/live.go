@@ -80,6 +80,8 @@ func runLive(ctx context.Context, self string, o liveOptions, adjust func(*livec
 	env.CAs, env.LogList, env.Sources = liveconf.DefaultCAs, nil, liveconf.DefaultSources
 	env.Timing.Request, env.Timing.Slow, env.Timing.Cleanup = liveRequest, liveSlow, liveCleanup
 	env.Timing.TTLUnit = liveTTLUnit
+	// The search sources of Certificate Transparency may take long and fail for a while.
+	env.Timing.Source, env.Timing.SourcePause = liveconf.DefaultTiming.Source, liveconf.DefaultTiming.SourcePause
 	s.ACMEProduction = o.env == "production"
 	if adjust != nil {
 		adjust(&env, r, pub.Addr())
