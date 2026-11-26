@@ -330,3 +330,126 @@ func TestGetFailsOnATruncatedBody(t *testing.T) {
 		t.Errorf("truncated body: %v", err)
 	}
 }
+
+// sourceTiming makes the limits of a search source short: an ordinary request may take 100 ms,
+// a source 1 s, with a pause of 20 ms between two attempts.
+func sourceTiming() Timing {
+	timing := testTiming()
+	timing.Request, timing.Source, timing.SourcePause = 100*time.Millisecond, time.Second, 20*time.Millisecond
+	return timing
+}
+
+// TestASourceMayTakeLongerThanARequest: a search source answers within its own limit, also
+// when that is longer than the limit of an ordinary request.
+func TestASourceMayTakeLongerThanARequest(t *testing.T) {
+	slow := http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		time.Sleep(300 * time.Millisecond)
+		_, _ = rw.Write([]byte(`[1]`))
+	})
+	w, url := webFor(t, slow, sourceTiming())
+	var list []int
+	if err := w.getList(ctx(t), url, &list); err != nil || len(list) != 1 {
+		t.Fatalf("%v %v", list, err)
+	}
+	if _, err := w.get(ctx(t), url, 10); kindOf(t, err) != kindTimeout {
+		t.Errorf("an ordinary request: %v", err)
+	}
+}
+
+// TestASlowRequestMayTakeLongerThanARequest: a request that waits for DNS has the limit Slow
+// for its answer, not that of an ordinary request (RELAY-v0 section 5.1).
+func TestASlowRequestMayTakeLongerThanARequest(t *testing.T) {
+	slow := http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		time.Sleep(300 * time.Millisecond)
+		_, _ = rw.Write([]byte(`{}`))
+	})
+	timing := testTiming()
+	timing.Request, timing.Slow = 100*time.Millisecond, time.Second
+	w, url := webFor(t, slow, timing)
+	if res, err := w.Do(ctx(t), http.MethodPost, url, nil, "", true); err != nil || res.Status != http.StatusOK {
+		t.Fatalf("%+v %v", res, err)
+	}
+}
+
+// TestASourceIsAskedAgainAfterATransientFailure: 5xx, 429 and no answer are repeated after a
+// pause, up to sourceAttempts times; what says no for good is not.
+func TestASourceIsAskedAgainAfterATransientFailure(t *testing.T) {
+	for name, tt := range map[string]struct {
+		statuses []int
+		ok       bool
+		asked    int32
+	}{
+		"502, then a list":    {[]int{502, 502, 200}, true, 3},
+		"429, then a list":    {[]int{429, 200}, true, 2},
+		"always 502":          {[]int{502, 502, 502, 200}, false, sourceAttempts},
+		"no answer, then 200": {[]int{0, 200}, true, 2},
+		"404 is final":        {[]int{404, 200}, false, 1},
+		"no list is final":    {[]int{-1, 200}, false, 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var asked atomic.Int32
+			h := http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+				switch s := tt.statuses[min(int(asked.Add(1)), len(tt.statuses))-1]; s {
+				case 0:
+					time.Sleep(1500 * time.Millisecond)
+				case -1:
+					_, _ = rw.Write([]byte(`{"not":"a list"}`))
+				default:
+					rw.WriteHeader(s)
+					_, _ = rw.Write([]byte(`[]`))
+				}
+			})
+			w, url := webFor(t, h, sourceTiming())
+			var list []int
+			err := w.getList(ctx(t), url, &list)
+			if (err == nil) != tt.ok || asked.Load() != tt.asked {
+				t.Errorf("error %v, asked %d times", err, asked.Load())
+			}
+		})
+	}
+}
+
+// TestTheSourcePausesComeOutOfTheBudget: without budget for a pause the source is not asked
+// again.
+func TestTheSourcePausesComeOutOfTheBudget(t *testing.T) {
+	var asked atomic.Int32
+	h := http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		asked.Add(1)
+		rw.WriteHeader(http.StatusBadGateway)
+	})
+	timing := sourceTiming()
+	timing.RetryBudget = timing.SourcePause / 2
+	w, url := webFor(t, h, timing)
+	var list []int
+	if err := w.getList(ctx(t), url, &list); err == nil || asked.Load() != 1 {
+		t.Errorf("error %v, asked %d times", err, asked.Load())
+	}
+}
+
+// TestASourceThatAsksForALongWaitIsNotAskedAgain: a Retry-After beyond the budget of the run is
+// honoured as final, not overridden by the pause of the tool.
+func TestASourceThatAsksForALongWaitIsNotAskedAgain(t *testing.T) {
+	var asked atomic.Int32
+	h := http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		asked.Add(1)
+		rw.Header().Set("Retry-After", "600")
+		rw.WriteHeader(http.StatusTooManyRequests)
+	})
+	w, url := webFor(t, h, sourceTiming())
+	var list []int
+	if err := w.getList(ctx(t), url, &list); err == nil || asked.Load() != 1 {
+		t.Errorf("error %v, asked %d times", err, asked.Load())
+	}
+}
+
+// TestACancelledRunSpendsNoPause: when the run ends, a failing source is not waited for.
+func TestACancelledRunSpendsNoPause(t *testing.T) {
+	h := http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) { rw.WriteHeader(http.StatusBadGateway) })
+	w, url := webFor(t, h, sourceTiming())
+	cancelled, cancel := context.WithCancel(ctx(t))
+	cancel()
+	var list []int
+	if err := w.getList(cancelled, url, &list); err == nil || w.spent != 0 {
+		t.Errorf("error %v, spent %v", err, w.spent)
+	}
+}

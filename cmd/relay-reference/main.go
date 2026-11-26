@@ -179,7 +179,7 @@ func finish(res liveconf.Result, reportPath string, stdout, stderr io.Writer) in
 // referenceTiming is DefaultTiming made small for the reference, which answers at once.
 func referenceTiming() liveconf.Timing {
 	return liveconf.Timing{
-		Request: 5 * time.Second, Slow: 10 * time.Second, Hook: 5 * time.Second, Visible: 2 * time.Second, Poll: 20 * time.Millisecond,
+		Request: 5 * time.Second, Slow: 10 * time.Second, Hook: 5 * time.Second, Source: 5 * time.Second, SourcePause: 20 * time.Millisecond, Visible: 2 * time.Second, Poll: 20 * time.Millisecond,
 		Cleanup: 5 * time.Second, RetryBudget: 300 * time.Millisecond, RetryUnit: 10 * time.Millisecond, TTLUnit: 10 * time.Millisecond,
 		Tunnel: 3 * time.Second, Close: 2 * time.Second, Slack: 150 * time.Millisecond, ControlWindow: 120 * time.Millisecond, Deny: 600 * time.Millisecond,
 	}

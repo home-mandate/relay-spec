@@ -3,6 +3,7 @@
 package liveconf
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"crypto/x509"
@@ -66,13 +67,46 @@ func (r *run) verifySnapshot(ctx context.Context, f ctFile, leaf *x509.Certifica
 	}
 }
 
-// getJSON fetches a list from a search source.
-func (r *run) getJSON(ctx context.Context, u string, v any) error {
-	got, err := r.web.get(ctx, u, maxSourceBytes)
-	if err != nil || got.Status != http.StatusOK || got.Over || json.Unmarshal(got.Body, v) != nil {
-		return errSource
+// sourceAttempts is how often a search source is asked for one list.
+const sourceAttempts = 3
+
+// getList fetches a list from a search source within the limit Source. A source that fails
+// for a while (no answer, 429 or 5xx) is asked again after SourcePause, which comes out of the
+// budget of the run; any other answer that is no list is final.
+func (w *Web) getList(ctx context.Context, u string, v any) error {
+	for attempt := 1; ; attempt++ {
+		got, err := w.getWithin(ctx, u, maxSourceBytes, cmp.Or(w.timing.Source, w.timing.Request))
+		if err == nil && got.Status == http.StatusOK && !got.Over {
+			if json.Unmarshal(got.Body, v) != nil {
+				return errSource
+			}
+			return nil
+		}
+		if !passing(got, err) || attempt == sourceAttempts || ctx.Err() != nil || !w.spend(w.timing.SourcePause) {
+			return errSource
+		}
+		if sleep(ctx, w.timing.SourcePause) != nil {
+			return errSource
+		}
 	}
-	return nil
+}
+
+// passing reports whether a failure of a search source may pass: no answer in time, a refused
+// connection, a rate limit without Retry-After or an error of the server, but not a refused
+// address or certificate, nor a Retry-After the run does not wait for.
+func passing(got fetched, err error) bool {
+	var nf *netFailure
+	switch {
+	case errors.Is(err, errWaitTooLong):
+		return false
+	case errors.Is(err, errRateLimited):
+		return true
+	case errors.As(err, &nf):
+		return nf.kind == kindTimeout || nf.kind == kindOther
+	case err != nil:
+		return false
+	}
+	return got.Status == http.StatusTooManyRequests || got.Status >= http.StatusInternalServerError
 }
 
 // certSpotter counts the certificates for the name with another key than the leaf that are
@@ -92,7 +126,7 @@ func (r *run) certSpotter(ctx context.Context, name string, leaf *x509.Certifica
 			Pubkey   string    `json:"pubkey_sha256"`
 			NotAfter time.Time `json:"not_after"`
 		}
-		if err := r.getJSON(ctx, strings.TrimSuffix(r.env.Sources.CertSpotter, "/")+"/v1/issuances?"+q.Encode(), &page); err != nil {
+		if err := r.web.getList(ctx, strings.TrimSuffix(r.env.Sources.CertSpotter, "/")+"/v1/issuances?"+q.Encode(), &page); err != nil {
 			return foreign, err
 		}
 		if len(page) == 0 {
@@ -119,7 +153,7 @@ func (r *run) crtSh(ctx context.Context, names []string, leaf *x509.Certificate,
 			Serial   string `json:"serial_number"`
 			NotAfter string `json:"not_after"`
 		}
-		if err := r.getJSON(ctx, r.env.Sources.CrtSh+"?"+url.Values{"q": {n}, "output": {"json"}}.Encode(), &list); err != nil {
+		if err := r.web.getList(ctx, r.env.Sources.CrtSh+"?"+url.Values{"q": {n}, "output": {"json"}}.Encode(), &list); err != nil {
 			return foreign, err
 		}
 		for _, e := range list {
