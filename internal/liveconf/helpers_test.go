@@ -4,6 +4,7 @@ package liveconf
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"io"
 	"log"
@@ -61,8 +62,15 @@ func serve(t *testing.T, cfg refop.Config) (*refop.Running, Env) {
 // URL to fetch.
 func webFor(t *testing.T, h http.Handler, timing Timing) (*Web, string) {
 	t.Helper()
+	return webForTLS(t, h, timing, 0)
+}
+
+// webForTLS is webFor with a server that speaks TLS up to maxVersion (zero: the newest).
+func webForTLS(t *testing.T, h http.Handler, timing Timing, maxVersion uint16) (*Web, string) {
+	t.Helper()
 	srv := httptest.NewUnstartedServer(h)
 	srv.Config.ErrorLog = log.New(io.Discard, "", 0)
+	srv.TLS = &tls.Config{MaxVersion: maxVersion}
 	srv.StartTLS()
 	t.Cleanup(srv.Close)
 	roots := x509.NewCertPool()

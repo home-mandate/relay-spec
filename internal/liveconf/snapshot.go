@@ -75,7 +75,7 @@ const sourceAttempts = 3
 // budget of the run; any other answer that is no list is final.
 func (w *Web) getList(ctx context.Context, u string, v any) error {
 	for attempt := 1; ; attempt++ {
-		got, err := w.getWithin(ctx, u, maxSourceBytes, cmp.Or(w.timing.Source, w.timing.Request))
+		got, err := w.getWithin(ctx, w.sources, u, maxSourceBytes, cmp.Or(w.timing.Source, w.timing.Request))
 		if err == nil && got.Status == http.StatusOK && !got.Over {
 			if json.Unmarshal(got.Body, v) != nil {
 				return errSource
